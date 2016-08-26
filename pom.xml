@@ -41,7 +41,7 @@
 						</descriptorRefs>
 						<archive>
 							<manifest>
-								<mainClass>org.panda.causalpath.XXX</mainClass>
+								<mainClass>org.panda.causalpath.run.RPPAFrontFace</mainClass>
 								<addClasspath>true</addClasspath>
 							</manifest>
 						</archive>

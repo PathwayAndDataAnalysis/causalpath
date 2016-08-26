@@ -5,7 +5,7 @@ import org.panda.causalpath.analyzer.CorrelationDetector;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationAndSelectedData;
-import org.panda.causalpath.resource.SignedPCUser;
+import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.causalpath.resource.TCGALoader;
 import org.panda.utility.Kronometre;
 
@@ -26,7 +26,7 @@ public class TCGARecurrentCorrelationRun
 	public static void main(String[] args) throws IOException
 	{
 		Kronometre k = new Kronometre();
-		String base = "/home/babur/Documents/RPPA/TCGA/basic-correlation/";
+		String base = "/home/babur/Documents/RPPA/TCGA/basic-correlation-rppa-mut/";
 		String single = base + "single/";
 		String recurrent = base + "recurrent/";
 		String tcgaDataDir = "/home/babur/Documents/TCGA";
@@ -43,7 +43,7 @@ public class TCGARecurrentCorrelationRun
 			{
 				String outFile = single + dir.getName() + ".sif";
 
-				Set<Relation> rels = SignedPCUser.getSignedPCRelations();
+				Set<Relation> rels = NetworkLoader.load();
 				System.out.println("rels.size() = " + rels.size());
 
 				System.out.println("dir = " + dir.getName());

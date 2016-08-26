@@ -56,8 +56,8 @@ public class CausalitySearcher
 			for (ExperimentData source : relation.sourceData)
 			{
 				if (skip(source, relation.source)) continue;
-				if (source instanceof ExpressionData) continue;
-				if (!(source instanceof ProteinData || source instanceof MutationData)) continue;
+//				if (source instanceof ExpressionData) continue;
+				if (!(source instanceof MutationData)) continue;
 
 				for (ExperimentData target : relation.targetData)
 				{

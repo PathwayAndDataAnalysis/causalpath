@@ -2,14 +2,13 @@ package org.panda.causalpath.run;
 
 import org.panda.causalpath.analyzer.CausalityHelper;
 import org.panda.causalpath.analyzer.CausalitySearcher;
-import org.panda.causalpath.analyzer.CorrelationDetector;
 import org.panda.causalpath.analyzer.SignificanceDetector;
 import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.MutationData;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationAndSelectedData;
-import org.panda.causalpath.resource.SignedPCUser;
+import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.causalpath.resource.TCGALoader;
 import org.panda.resource.tcga.MutSigReader;
 import org.panda.utility.Kronometre;
@@ -36,21 +35,21 @@ public class TCGAEffectOfMutationRun
 
 		for (File dir : new File(tcgaDataDir).listFiles())
 		{
-//			if (!dir.getName().equals("BRCA")) continue;
+			if (!dir.getName().equals("BRCA")) continue;
 
 			if (Files.exists(Paths.get(dir.getPath() + "/rppa.txt")) &&
 				Files.exists(Paths.get(dir.getPath() + "/scores-mutsig.txt")) &&
 				Files.exists(Paths.get(dir.getPath() + "/mutation.maf")))
 			{
-
 				Map<String, Double> pvals = MutSigReader.readPValues(dir.getPath());
 				List<String> select = FDR.select(pvals, null, 0.01);
+				select.retainAll(Collections.singleton("PIK3CA"));
 				System.out.println("select.size() = " + select.size());
 				if (select.isEmpty()) continue;
 
 				File outDir = new File(base + dir.getName());
 
-				Set<Relation> rels = SignedPCUser.getSignedPCRelations();
+				Set<Relation> rels = NetworkLoader.load();
 				System.out.println("rels.size() = " + rels.size());
 
 				System.out.println("dir = " + dir.getName());
@@ -73,7 +72,7 @@ public class TCGAEffectOfMutationRun
 					boolean[] test = md.getMutated();
 					boolean[] control = md.getNotMutated();
 
-					SignificanceDetector det = new SignificanceDetector(0.05, control, test);
+					SignificanceDetector det = new SignificanceDetector(0.5, control, test);
 					CausalityHelper ch = new CausalityHelper();
 					for (Relation rel : rels)
 					{

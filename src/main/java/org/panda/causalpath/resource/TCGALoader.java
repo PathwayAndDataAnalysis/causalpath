@@ -32,8 +32,8 @@ public class TCGALoader
 
 	public TCGALoader(String dir)
 	{
-		try{cnaReader = new CNAReader(dir + COPY_NUMBER_FILE, false, 0);} catch (FileNotFoundException e){}
-		try{expReader = new ExpressionReader(dir + EXPRESSION_FILE);} catch (FileNotFoundException e){}
+//		try{cnaReader = new CNAReader(dir + COPY_NUMBER_FILE, false, 0);} catch (FileNotFoundException e){}
+//		try{expReader = new ExpressionReader(dir + EXPRESSION_FILE);} catch (FileNotFoundException e){}
 		try{mutReader = new MutationReader(dir + MUTATION_FILE);} catch (IOException e){}
 		try{rppaReader = new RPPAReader(dir + RPPA_FILE);} catch (FileNotFoundException e){}
 		this.samples = getUnionSamples();

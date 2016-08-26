@@ -2,16 +2,14 @@ package org.panda.causalpath.run;
 
 import org.panda.causalpath.analyzer.CausalitySearcher;
 import org.panda.causalpath.analyzer.ThresholdDetector;
-import org.panda.causalpath.data.Activity;
 import org.panda.causalpath.data.ActivityData;
-import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.ProteinData;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationAndSelectedData;
 import org.panda.causalpath.resource.RPPAFileReader;
 import org.panda.causalpath.resource.RPPALoader;
-import org.panda.causalpath.resource.SignedPCUser;
+import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.resource.PhosphoSitePlus;
 import org.panda.resource.ResourceDirectory;
 import org.panda.resource.tcga.RPPAData;
@@ -93,7 +91,7 @@ public class RPPAFrontFace
 		loader.associateChangeDetector(new ThresholdDetector(0.1), data -> data instanceof ActivityData);
 
 		// Load signed relations
-		Set<Relation> relations = SignedPCUser.getSignedPCRelations();
+		Set<Relation> relations = NetworkLoader.load();
 		loader.decorateRelations(relations);
 
 		// Prepare causality searcher

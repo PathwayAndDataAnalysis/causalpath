@@ -4,7 +4,9 @@ import org.panda.causalpath.data.PhosphoSite;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationType;
 import org.panda.resource.PhosphoSitePlus;
+import org.panda.resource.network.PhosphoNetworks;
 import org.panda.resource.network.SignedPC;
+import org.panda.resource.network.TRRUST;
 import org.panda.resource.signednetwork.SignedType;
 import org.panda.utility.graph.Graph;
 import org.panda.utility.graph.PhosphoGraph;
@@ -14,16 +16,31 @@ import java.util.*;
 /**
  * Created by babur on 4/4/16.
  */
-public class SignedPCUser
+public class NetworkLoader
 {
-	public static Set<Relation> getSignedPCRelations()
+	public static Set<Relation> load()
 	{
 		Set<Relation> relations = new HashSet<>();
+
+		// Load signed directed graph from Pathway Commons
+
 		SignedPC spc = new SignedPC();
 		Map<SignedType, Graph> allGraphs = spc.getAllGraphs();
+
+		// Add PhoshoNetworks and TRRUST
+
+		allGraphs.get(SignedType.PHOSPHORYLATES).merge(PhosphoNetworks.get().getGraph());
+		allGraphs.get(SignedType.UPREGULATES_EXPRESSION).merge(TRRUST.get().getPositiveGraph());
+		allGraphs.get(SignedType.DOWNREGULATES_EXPRESSION).merge(TRRUST.get().getNegativeGraph());
+
+		// Generate relations based on the network
+
 		for (SignedType signedType : allGraphs.keySet())
 		{
 			Graph graph = allGraphs.get(signedType);
+
+			// take a subset of the network for debugging
+			graph.crop(Arrays.asList("PIK3CA", "AKT1"));
 
 			for (String source : graph.getOneSideSymbols(true))
 			{
