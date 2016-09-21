@@ -23,6 +23,7 @@ public class CausalitySearcher
 	static Set<Class<? extends ExperimentData>> eSet = Collections.singleton(ProteinData.class);
 
 	private boolean forceSiteMatching = true;
+	private boolean addInUnknownSigns = false;
 	private Set<String> genesWithTotalProteinData;
 
 	/**
@@ -57,7 +58,7 @@ public class CausalitySearcher
 			{
 				if (skip(source, relation.source)) continue;
 //				if (source instanceof ExpressionData) continue;
-				if (!(source instanceof MutationData)) continue;
+//				if (!(source instanceof MutationData)) continue;
 
 				for (ExperimentData target : relation.targetData)
 				{
@@ -71,7 +72,8 @@ public class CausalitySearcher
 							((PhosphoProteinData) target).getGenesWithSites())) continue;
 
 					int chgSign = relation.chDet.getChangeSign(source, target);
-					boolean causative = chgSign * source.getEffect() * relation.getSign() * compatible == 1;
+					int sign = chgSign * source.getEffect() * relation.getSign() * compatible;
+					boolean causative = addInUnknownSigns ? sign != -1 : sign == 1;
 					if (causative)
 					{
 						selected.add(new RelationAndSelectedData(relation, source, target));
@@ -96,5 +98,10 @@ public class CausalitySearcher
 	public void setForceSiteMatching(boolean forceSiteMatching)
 	{
 		this.forceSiteMatching = forceSiteMatching;
+	}
+
+	public void setAddInUnknownSigns(boolean add)
+	{
+		this.addInUnknownSigns = add;
 	}
 }

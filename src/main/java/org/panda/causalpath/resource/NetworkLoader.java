@@ -40,7 +40,7 @@ public class NetworkLoader
 			Graph graph = allGraphs.get(signedType);
 
 			// take a subset of the network for debugging
-			graph.crop(Arrays.asList("PIK3CA", "AKT1"));
+//			graph.crop(Arrays.asList("PIK3CA", "AKT1"));
 
 			for (String source : graph.getOneSideSymbols(true))
 			{

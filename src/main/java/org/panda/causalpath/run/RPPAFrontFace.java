@@ -42,6 +42,7 @@ public class RPPAFrontFace
 	 * @param siteMatchStrict option to enforce matching a phosphorylation site in the network with
 	 *                       the annotation of antibody
 	 * @param geneCentric Option to produce a gene-centric or an antibody-centric graph
+	 * @param addInUnknownEffects Option to add the phospho sites with unknown effects as potential cause or conflict
 	 * @param outputFilePrefix If the user provides xxx, then xxx.sif and xxx.format are generated
 	 * @param customNetworkDirectory The directory that the network will be downloaded and SignedPC
 	 *                               directory will be created in. Pass null to use default
@@ -50,7 +51,7 @@ public class RPPAFrontFace
 	public static void generateRPPAGraphs(String platformFile, String idColumn,
 		String symbolsColumn, String sitesColumn, String effectColumn, String valuesFile,
 		String valueColumn, double valueThreshold, String graphType, boolean siteMatchStrict,
-		boolean geneCentric, String outputFilePrefix, String customNetworkDirectory)
+		boolean geneCentric, boolean addInUnknownEffects, String outputFilePrefix, String customNetworkDirectory)
 		throws IOException
 	{
 		if (customNetworkDirectory != null) ResourceDirectory.set(customNetworkDirectory);
@@ -66,7 +67,8 @@ public class RPPAFrontFace
 		// Fill-in missing effect from PhosphoSitePlus
 		PhosphoSitePlus.get().fillInMissingEffect(rppas, 0);
 
-		generateRPPAGraphs(rppas, valueThreshold, graphType, siteMatchStrict, geneCentric, outputFilePrefix);
+		generateRPPAGraphs(rppas, valueThreshold, graphType, siteMatchStrict, geneCentric, addInUnknownEffects,
+			outputFilePrefix);
 	}
 
 	/**
@@ -82,7 +84,7 @@ public class RPPAFrontFace
 	 * @throws IOException
 	 */
 	public static void generateRPPAGraphs(Collection<RPPAData> rppas, double valueThreshold, String graphType,
-		boolean siteMatchStrict, boolean geneCentric, String outputFilePrefix)
+		boolean siteMatchStrict, boolean geneCentric, boolean addInUnknownEffects, String outputFilePrefix)
 		throws IOException
 	{
 		RPPALoader loader = new RPPALoader(rppas);
@@ -97,6 +99,7 @@ public class RPPAFrontFace
 		// Prepare causality searcher
 		CausalitySearcher cs = new CausalitySearcher();
 		cs.setForceSiteMatching(siteMatchStrict);
+		cs.setAddInUnknownSigns(addInUnknownEffects);
 
 		// Search causal or conflicting relations
 		Set<RelationAndSelectedData> relDat = graphType.toLowerCase().startsWith("conflict") ?
@@ -115,6 +118,6 @@ public class RPPAFrontFace
 	{
 		generateRPPAGraphs("/home/ozgun/Documents/JQ1/abdata-chibe.txt", "ID1", "Symbols", "Sites",
 			"Effect", "/home/ozgun/Documents/JQ1/ovcar4_dif_drug_sig.txt", "change", 0.001,
-			"compatible", true, false, "/home/ozgun/Temp/temp", null);
+			"compatible", true, false, false, "/home/ozgun/Temp/temp", null);
 	}
 }
