@@ -94,7 +94,7 @@ public class GraphWriter
 				if (pd.getEffect() > 0) bor = inString(activatingBorderColor);
 				else if (pd.getEffect() < 0) bor = inString(inhibitingBorderColor);
 
-				let = "p";
+				let = " ";
 			}
 			else if (data instanceof ProteinData)
 			{

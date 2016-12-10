@@ -24,33 +24,21 @@ public class CausalitySearcher
 
 	private boolean forceSiteMatching = true;
 	private boolean addInUnknownSigns = false;
+	private int siteProximityThreshold = 0;
 	private Set<String> genesWithTotalProteinData;
+	/**
+	 * If that is false, then we are interested in conflicting relations.
+	 */
+	private boolean causal = true;
 
 	/**
-	 * The relations have to be associated with experiment data. Both the experiment data and the relations have to be
-	 * associated with related change detectors.
+	 * Finds compatible or conflicting relations. The relations have to be associated with experiment data. Both the
+	 * experiment data and the relations have to be associated with related change detectors.
 	 */
-	public Set<RelationAndSelectedData> selectCausalRelations(Set<Relation> relations)
-	{
-		return selectCausalRelations(relations, 1);
-	}
-
-	/**
-	 * The relations have to be associated with experiment data. Both the experiment data and the relations have to be
-	 * associated with related change detectors.
-	 */
-	public Set<RelationAndSelectedData> selectConflictingRelations(Set<Relation> relations)
-	{
-		return selectCausalRelations(relations, -1);
-	}
-
-	/**
-	 * Finds compatible or conflicting relations.
-	 * @param compatible 1 if compatible, -1 is conflicting
-	 */
-	private Set<RelationAndSelectedData> selectCausalRelations(Set<Relation> relations, int compatible)
+	public Set<RelationAndSelectedData> run(Set<Relation> relations)
 	{
 		Set<RelationAndSelectedData> selected = new HashSet<>();
+		int compatible = causal ? 1 : -1;
 
 		for (Relation relation : relations)
 		{
@@ -68,7 +56,7 @@ public class CausalitySearcher
 
 					// Check if site-matching constraint holds
 					if (forceSiteMatching && relation.type.affectsPhosphoSite && target instanceof PhosphoProteinData &&
-						CollectionUtil.intersectionEmpty(relation.getTargetWithSites(),
+						CollectionUtil.intersectionEmpty(relation.getTargetWithSites(siteProximityThreshold),
 							((PhosphoProteinData) target).getGenesWithSites())) continue;
 
 					int chgSign = relation.chDet.getChangeSign(source, target);
@@ -93,6 +81,16 @@ public class CausalitySearcher
 	public void setGenesWithTotalProteinData(Set<String> genesWithTotalProteinData)
 	{
 		this.genesWithTotalProteinData = genesWithTotalProteinData;
+	}
+
+	public void setSiteProximityThreshold(int thr)
+	{
+		this.siteProximityThreshold = thr;
+	}
+
+	public void setCausal(boolean causal)
+	{
+		this.causal = causal;
 	}
 
 	public void setForceSiteMatching(boolean forceSiteMatching)

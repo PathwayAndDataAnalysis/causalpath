@@ -51,8 +51,8 @@ public class RPPAFrontFace
 	public static void generateRPPAGraphs(String platformFile, String idColumn,
 		String symbolsColumn, String sitesColumn, String effectColumn, String valuesFile,
 		String valueColumn, double valueThreshold, String graphType, boolean siteMatchStrict,
-		boolean geneCentric, boolean addInUnknownEffects, String outputFilePrefix, String customNetworkDirectory)
-		throws IOException
+		int siteMatchProximityThreshold, int siteEffectProximityThreshold, boolean geneCentric,
+		boolean addInUnknownEffects, String outputFilePrefix, String customNetworkDirectory) throws IOException
 	{
 		if (customNetworkDirectory != null) ResourceDirectory.set(customNetworkDirectory);
 
@@ -65,9 +65,9 @@ public class RPPAFrontFace
 		RPPAFileReader.addValues(rppas, valuesFile, idColumn, vals, 0D);
 
 		// Fill-in missing effect from PhosphoSitePlus
-		PhosphoSitePlus.get().fillInMissingEffect(rppas, 0);
+		PhosphoSitePlus.get().fillInMissingEffect(rppas, siteEffectProximityThreshold);
 
-		generateRPPAGraphs(rppas, valueThreshold, graphType, siteMatchStrict, geneCentric, addInUnknownEffects,
+		generateRPPAGraphs(rppas, valueThreshold, graphType, siteMatchStrict, siteMatchProximityThreshold, geneCentric, addInUnknownEffects,
 			outputFilePrefix);
 	}
 
@@ -84,7 +84,7 @@ public class RPPAFrontFace
 	 * @throws IOException
 	 */
 	public static void generateRPPAGraphs(Collection<RPPAData> rppas, double valueThreshold, String graphType,
-		boolean siteMatchStrict, boolean geneCentric, boolean addInUnknownEffects, String outputFilePrefix)
+		boolean siteMatchStrict, int siteMatchProximityThreshold, boolean geneCentric, boolean addInUnknownEffects, String outputFilePrefix)
 		throws IOException
 	{
 		RPPALoader loader = new RPPALoader(rppas);
@@ -100,10 +100,11 @@ public class RPPAFrontFace
 		CausalitySearcher cs = new CausalitySearcher();
 		cs.setForceSiteMatching(siteMatchStrict);
 		cs.setAddInUnknownSigns(addInUnknownEffects);
+		if (graphType.toLowerCase().startsWith("conflict")) cs.setCausal(false);
+		cs.setSiteProximityThreshold(siteMatchProximityThreshold);
 
 		// Search causal or conflicting relations
-		Set<RelationAndSelectedData> relDat = graphType.toLowerCase().startsWith("conflict") ?
-			cs.selectConflictingRelations(relations) : cs.selectCausalRelations(relations);
+		Set<RelationAndSelectedData> relDat =  cs.run(relations);
 
 		GraphWriter writer = new GraphWriter(relDat);
 		writer.setUseGeneBGForTotalProtein(true);
@@ -118,6 +119,6 @@ public class RPPAFrontFace
 	{
 		generateRPPAGraphs("/home/ozgun/Documents/JQ1/abdata-chibe.txt", "ID1", "Symbols", "Sites",
 			"Effect", "/home/ozgun/Documents/JQ1/ovcar4_dif_drug_sig.txt", "change", 0.001,
-			"compatible", true, false, false, "/home/ozgun/Temp/temp", null);
+			"compatible", true, 0, 0, false, false, "/home/ozgun/Temp/temp", null);
 	}
 }

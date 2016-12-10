@@ -20,6 +20,11 @@ public class PhosphoSite
 		this.effect = effect;
 	}
 
+	public int getSite()
+	{
+		return site;
+	}
+
 	@Override
 	public String toString()
 	{

@@ -85,7 +85,7 @@ public class TCGAEffectOfMutationRun
 					}
 
 					CausalitySearcher searcher = new CausalitySearcher();
-					Set<RelationAndSelectedData> causal = searcher.selectCausalRelations(rels);
+					Set<RelationAndSelectedData> causal = searcher.run(rels);
 
 					System.out.println("causal.size() = " + causal.size());
 

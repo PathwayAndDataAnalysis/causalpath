@@ -58,13 +58,17 @@ public class Relation
 			(sites == null ? "" : "\t" + CollectionUtil.merge(sites, ";"));
 	}
 
-	public Set<String> getTargetWithSites()
+	public Set<String> getTargetWithSites(int proximityThr)
 	{
 		if (sites == null) return Collections.emptySet();
 		Set<String> set = new HashSet<>();
 		for (PhosphoSite site : sites)
 		{
-			set.add(target + "_" + site);
+			for (int i = 0; i <= proximityThr; i++)
+			{
+				set.add(target + "_" + (site.getSite() + i));
+				set.add(target + "_" + (site.getSite() - i));
+			}
 		}
 		return set;
 	}

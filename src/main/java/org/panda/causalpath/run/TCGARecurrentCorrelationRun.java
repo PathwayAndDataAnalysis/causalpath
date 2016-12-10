@@ -61,7 +61,7 @@ public class TCGARecurrentCorrelationRun
 				}
 				CausalitySearcher searcher = new CausalitySearcher();
 //				searcher.setGenesWithTotalProteinData(loader.getGenesWithTotalProteinData());
-				Set<RelationAndSelectedData> causal = searcher.selectCausalRelations(rels);
+				Set<RelationAndSelectedData> causal = searcher.run(rels);
 
 				for (RelationAndSelectedData r : causal)
 				{

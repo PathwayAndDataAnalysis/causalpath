@@ -47,7 +47,7 @@ public class PhosphoProteinData extends ProteinData
 
 		Set<String> set = new HashSet<>();
 		siteMap.keySet().stream().forEach(gene ->
-			set.addAll(siteMap.get(gene).stream().map(site -> gene + "_" + site).collect(Collectors.toList())));
+			set.addAll(siteMap.get(gene).stream().map(site -> gene + "_" + site.getSite()).collect(Collectors.toList())));
 
 		return set;
 	}
