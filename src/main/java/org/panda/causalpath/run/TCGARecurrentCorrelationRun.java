@@ -18,8 +18,6 @@ import java.util.Set;
 
 /**
  * For finding recurrent causative correlations in TCGA RPPA data.
- *
- * Created by babur on 4/18/16.
  */
 public class TCGARecurrentCorrelationRun
 {

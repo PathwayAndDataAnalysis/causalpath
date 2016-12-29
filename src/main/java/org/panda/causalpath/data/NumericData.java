@@ -3,10 +3,13 @@ package org.panda.causalpath.data;
 import java.util.Set;
 
 /**
- * Created by babur on 3/24/16.
+ * Base class for numeric data types.
  */
 public abstract class NumericData extends ExperimentData
 {
+	/**
+	 * Array for the numerical values.
+	 */
 	public double[] vals;
 
 	public NumericData(String id, String symbol)

@@ -7,12 +7,12 @@ import org.panda.causalpath.data.ProteinData;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationAndSelectedData;
-import org.panda.causalpath.resource.RPPAFileReader;
-import org.panda.causalpath.resource.RPPALoader;
+import org.panda.causalpath.resource.ProteomicsFileReader;
+import org.panda.causalpath.resource.ProteomicsLoader;
 import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.resource.PhosphoSitePlus;
 import org.panda.resource.ResourceDirectory;
-import org.panda.resource.tcga.RPPAData;
+import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * This class reads the RPPA platform and data files, and generates a ChiBE SIF graph.
+ * This class reads the proteomics platform and data files, and generates a ChiBE SIF graph.
  *
  * @author Ozgun Babur
  */
@@ -57,24 +57,24 @@ public class RPPAFrontFace
 		if (customNetworkDirectory != null) ResourceDirectory.set(customNetworkDirectory);
 
 		// Read platform file
-		List<RPPAData> rppas = RPPAFileReader.readAnnotation(platformFile, idColumn, symbolsColumn,
+		List<ProteomicsFileRow> rows = ProteomicsFileReader.readAnnotation(platformFile, idColumn, symbolsColumn,
 			sitesColumn, effectColumn);
 
 		// Read values
 		List<String> vals = Collections.singletonList(valueColumn);
-		RPPAFileReader.addValues(rppas, valuesFile, idColumn, vals, 0D);
+		ProteomicsFileReader.addValues(rows, valuesFile, idColumn, vals, 0D);
 
 		// Fill-in missing effect from PhosphoSitePlus
-		PhosphoSitePlus.get().fillInMissingEffect(rppas, siteEffectProximityThreshold);
+		PhosphoSitePlus.get().fillInMissingEffect(rows, siteEffectProximityThreshold);
 
-		generateRPPAGraphs(rppas, valueThreshold, graphType, siteMatchStrict, siteMatchProximityThreshold, geneCentric, addInUnknownEffects,
-			outputFilePrefix);
+		generateRPPAGraphs(rows, valueThreshold, graphType, siteMatchStrict, siteMatchProximityThreshold, geneCentric,
+			addInUnknownEffects, outputFilePrefix);
 	}
 
 	/**
 	 * For the given RPPA data, generates a ChiBE SIF graph.
 	 *
-	 * @param rppas The RPPA data that is read from en external source
+	 * @param rows The proteomics data rows that are read from an external source
 	 * @param valueThreshold The value threshold to be considered as significant
 	 * @param graphType Either "compatible" or "conflicting"
 	 * @param siteMatchStrict option to enforce matching a phosphorylation site in the network with
@@ -83,11 +83,11 @@ public class RPPAFrontFace
 	 * @param outputFilePrefix If the user provides xxx, then xxx.sif and xxx.format are generated
 	 * @throws IOException
 	 */
-	public static void generateRPPAGraphs(Collection<RPPAData> rppas, double valueThreshold, String graphType,
-		boolean siteMatchStrict, int siteMatchProximityThreshold, boolean geneCentric, boolean addInUnknownEffects, String outputFilePrefix)
-		throws IOException
+	public static void generateRPPAGraphs(Collection<ProteomicsFileRow> rows, double valueThreshold, String graphType,
+		boolean siteMatchStrict, int siteMatchProximityThreshold, boolean geneCentric, boolean addInUnknownEffects,
+		String outputFilePrefix) throws IOException
 	{
-		RPPALoader loader = new RPPALoader(rppas);
+		ProteomicsLoader loader = new ProteomicsLoader(rows);
 		// Associate change detectors
 		loader.associateChangeDetector(new ThresholdDetector(valueThreshold), data -> data instanceof ProteinData);
 		loader.associateChangeDetector(new ThresholdDetector(0.1), data -> data instanceof ActivityData);

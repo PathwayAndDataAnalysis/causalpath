@@ -6,9 +6,7 @@ import org.panda.causalpath.data.CategoricalData;
 import org.panda.utility.ArrayUtil;
 
 /**
- * For detection based on difference of mean values of two groups.
- *
- * Created by babur on 3/24/16.
+ * For change detection based on difference of mean values of two groups.
  */
 public class DifferenceDetector extends ComparisonDetector
 {

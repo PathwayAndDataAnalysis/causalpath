@@ -8,9 +8,7 @@ import org.panda.utility.statistics.ChiSquare;
 import org.panda.utility.statistics.TTest;
 
 /**
- * Does a t-test if data is numerical, and does a chi-square test if data is categorical.
- *
- * Created by babur on 3/24/16.
+ * Checks the significance of separation of control and test groups.
  */
 public class SignificanceDetector extends DifferenceDetector
 {
@@ -26,6 +24,9 @@ public class SignificanceDetector extends DifferenceDetector
 		return p < threshold ? getChangeValue(data) > 0 ? 1 : -1 : 0;
 	}
 
+	/**
+	 * Does a t-test if data is numerical, and does a chi-square test if data is categorical.
+	 */
 	private double getPValue(ExperimentData data)
 	{
 		if (data instanceof NumericData)

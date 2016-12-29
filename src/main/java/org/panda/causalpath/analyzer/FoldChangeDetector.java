@@ -5,7 +5,7 @@ import org.panda.causalpath.data.NumericData;
 import org.panda.utility.ArrayUtil;
 
 /**
- * Created by babur on 3/24/16.
+ * Change detector based on fold difference.
  */
 public class FoldChangeDetector extends ComparisonDetector
 {

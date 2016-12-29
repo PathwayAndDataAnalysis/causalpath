@@ -1,9 +1,11 @@
 package org.panda.causalpath.data;
 
 /**
- * Created by babur on 3/24/16.
+ *  1: Activated
+ *  0: Unknown
+ * -1: Inactivated
  */
-public class Activity extends SingleQData
+public class Activity extends SingleCategoricalData
 {
 	public Activity(int effect)
 	{

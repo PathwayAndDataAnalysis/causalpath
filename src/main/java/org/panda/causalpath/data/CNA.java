@@ -1,9 +1,9 @@
 package org.panda.causalpath.data;
 
 /**
- * Created by babur on 4/5/16.
+ * A single copy number alteration.
  */
-public class CNA extends SingleQData
+public class CNA extends SingleCategoricalData
 {
 	public CNA(int category)
 	{

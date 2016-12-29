@@ -7,23 +7,33 @@ import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.PhosphoProteinData;
 import org.panda.causalpath.data.ProteinData;
 import org.panda.causalpath.network.Relation;
-import org.panda.resource.tcga.RPPAData;
+import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.util.*;
 
 /**
- * @author Ozgun Babur
+ * Coverts the RPPAData in resource project to appropriate objects for this project and serves them.
  */
-public class RPPALoader
+public class ProteomicsLoader
 {
+	/**
+	 * Map from genes to related data.
+	 */
 	Map<String, Set<ExperimentData>> dataMap;
+
+	/**
+	 * Set of all data. This collection supposed to hold everything in the dataMap's values.
+	 */
 	Set<ExperimentData> datas;
 
-	public RPPALoader(Collection<RPPAData> rppas)
+	/**
+	 * Initializes self using a set of RPPAData.
+	 */
+	public ProteomicsLoader(Collection<ProteomicsFileRow> rows)
 	{
 		dataMap = new HashMap<>();
 		datas = new HashSet<>();
-		rppas.stream().distinct().forEach(r ->
+		rows.stream().distinct().forEach(r ->
 		{
 			ExperimentData ed = r.isActivity() ? new ActivityData(r) :
 				r.isPhospho() ? new PhosphoProteinData(r) : new ProteinData(r);
@@ -37,6 +47,9 @@ public class RPPALoader
 		});
 	}
 
+	/**
+	 * Adds the related data to the given relations.
+	 */
 	public void decorateRelations(Set<Relation> relations)
 	{
 		CausalityHelper ch = new CausalityHelper();
@@ -48,11 +61,17 @@ public class RPPALoader
 		}
 	}
 
+	/**
+	 * Puts the given change detector to the data that is filtered by the given selector.
+	 */
 	public void associateChangeDetector(OneDataChangeDetector chDet, DataSelector selector)
 	{
 		datas.stream().filter(selector::select).forEach(d -> d.setChDet(chDet));
 	}
 
+	/**
+	 * Function to filter experiment data.
+	 */
 	public interface DataSelector
 	{
 		boolean select(ExperimentData data);

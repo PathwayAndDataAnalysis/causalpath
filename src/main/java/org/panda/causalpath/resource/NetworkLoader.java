@@ -14,10 +14,13 @@ import org.panda.utility.graph.PhosphoGraph;
 import java.util.*;
 
 /**
- * Created by babur on 4/4/16.
+ * Provides the signed relations in Pathway Commons as a set of Relation objects.
  */
 public class NetworkLoader
 {
+	/**
+	 * Reads Pathway Commons from the SignedPC in the resource project.
+	 */
 	public static Set<Relation> load()
 	{
 		Set<Relation> relations = new HashSet<>();

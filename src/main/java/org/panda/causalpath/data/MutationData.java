@@ -3,7 +3,7 @@ package org.panda.causalpath.data;
 import org.panda.utility.ArrayUtil;
 
 /**
- * Created by babur on 3/24/16.
+ * Data array for mutations.
  */
 public class MutationData extends CategoricalData
 {
@@ -12,6 +12,9 @@ public class MutationData extends CategoricalData
 		super(id, symbol);
 	}
 
+	/**
+	 * Gets the marking of mutated samples.
+	 */
 	public boolean[] getMutated()
 	{
 		// Why don't java 8 have boolean streams?
@@ -24,6 +27,9 @@ public class MutationData extends CategoricalData
 		return b;
 	}
 
+	/**
+	 * Gets the marking of not-mutated samples.
+	 */
 	public boolean[] getNotMutated()
 	{
 		boolean[] b = new boolean[data.length];

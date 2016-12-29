@@ -3,12 +3,24 @@ package org.panda.causalpath.network;
 import org.panda.causalpath.data.ExperimentData;
 
 /**
- * Created by babur on 4/18/16.
+ * This is a causative relation. It holds a pathway relation and two experiment data whose dependency can be explained
+ * with that relation.
  */
 public class RelationAndSelectedData
 {
+	/**
+	 * The edge.
+	 */
 	public Relation relation;
+
+	/**
+	 * Source data.
+	 */
 	public ExperimentData source;
+
+	/**
+	 * Target data.
+	 */
 	public ExperimentData target;
 
 	public RelationAndSelectedData(Relation relation, ExperimentData source, ExperimentData target)

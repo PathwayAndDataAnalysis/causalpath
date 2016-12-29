@@ -1,12 +1,12 @@
 package org.panda.causalpath.data;
 
-import org.panda.resource.tcga.RPPAData;
+import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Created by babur on 3/24/16.
+ * Total protein measurement.
  */
 public class ProteinData extends NumericData
 {
@@ -15,9 +15,12 @@ public class ProteinData extends NumericData
 		super(id, geneSymbols);
 	}
 
-	public ProteinData(RPPAData rppa)
+	/**
+	 * Converts an RPPAData object from the "resource" project.
+	 */
+	public ProteinData(ProteomicsFileRow row)
 	{
-		this(rppa.id, new HashSet<>(rppa.genes));
-		this.vals = rppa.vals;
+		this(row.id, new HashSet<>(row.genes));
+		this.vals = row.vals;
 	}
 }

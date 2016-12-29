@@ -3,7 +3,8 @@ package org.panda.causalpath.analyzer;
 import org.panda.causalpath.data.ExperimentData;
 
 /**
- * Created by babur on 3/24/16.
+ * This two-data change detector checks if the data changed in similar (1) or opposite (-1) directions. 0 means at least
+ * one data is not changed. This class helps causality detection when controls and tests are compared.
  */
 public class CausalityHelper implements TwoDataChangeDetector
 {

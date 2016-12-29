@@ -12,15 +12,25 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
- * Created by babur on 4/6/16.
+ * This class prepares the causality graph in two files, to display in ChiBE.
  */
 public class GraphWriter
 {
+	/**
+	 * Border color of activating phosphorylations or mutations.
+	 */
 	private Color activatingBorderColor;
+	/**
+	 * Border color of inhibiting phosphorylations or mutations.
+	 */
 	private Color inhibitingBorderColor;
+
+	/**
+	 * Parameter to use gene background to display the total protein change. If false, then it is displayed on the gene
+	 * node as a separate feature.
+	 */
 	private boolean useGeneBGForTotalProtein;
 
 	/**
@@ -28,8 +38,14 @@ public class GraphWriter
 	 */
 	private ValToColor vtc;
 
+	/**
+	 * The set of relations with the associated data to draw.
+	 */
 	private Set<RelationAndSelectedData> relations;
 
+	/**
+	 * Constructor with the relations. Those relations are the result of the causality search.
+	 */
 	public GraphWriter(Set<RelationAndSelectedData> relations)
 	{
 		this.relations = relations;
@@ -62,6 +78,10 @@ public class GraphWriter
 		this.vtc = vtc;
 	}
 
+	/**
+	 * Produces a causality graph where each node corresponds to a gene. In this graph, data may be displayed more than
+	 * once if they map to more than one gene.
+	 */
 	public void writeGeneCentric(String filename) throws IOException
 	{
 		if (!filename.endsWith(".sif")) filename += ".sif";
@@ -94,7 +114,7 @@ public class GraphWriter
 				if (pd.getEffect() > 0) bor = inString(activatingBorderColor);
 				else if (pd.getEffect() < 0) bor = inString(inhibitingBorderColor);
 
-				let = " ";
+				let = "p";
 			}
 			else if (data instanceof ProteinData)
 			{
@@ -143,11 +163,18 @@ public class GraphWriter
 		writer2.close();
 	}
 
+	/**
+	 * Converts color to a string.
+	 */
 	private String inString(Color c)
 	{
 		return c.getRed() + " " + c.getGreen() + " " + c.getBlue();
 	}
 
+	/**
+	 * Generates a causality graph where each node is a measurement. In this graph, pathway relations can be displayed
+	 * more than once if the same relation can explain more than one data pairs.
+	 */
 	public void writeDataCentric(String filename) throws IOException
 	{
 		if (!filename.endsWith(".sif")) filename += ".sif";

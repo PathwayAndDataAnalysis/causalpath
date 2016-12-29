@@ -12,7 +12,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Created by babur on 4/14/16.
+ * This is an experimental class that infers the mutations being activating or inactivating using the rate of deleterous
+ * mutations. It works for some major oncogenes and tumor suppressors, but there is a major gray area.
+ *
+ * @deprecated
  */
 public class MutationClassifier
 {

@@ -1,7 +1,7 @@
 package org.panda.causalpath.data;
 
 /**
- * Created by babur on 4/5/16.
+ * Numeric data array for RNA expression.
  */
 public class ExpressionData extends NumericData
 {

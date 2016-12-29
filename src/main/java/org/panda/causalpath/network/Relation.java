@@ -11,24 +11,49 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * That is a potential causality edge.
- *
- * Created by babur on 3/24/16.
+ * That is a potential causality relation.
  */
 public class Relation
 {
+	/**
+	 * Source gene.
+	 */
 	public String source;
+
+	/**
+	 * Target gene.
+	 */
 	public String target;
+
+	/**
+	 * The type of the relation.
+	 */
 	public RelationType type;
 
+	/**
+	 * Set of experiment data associated with source gene.
+	 */
 	public Set<ExperimentData> sourceData;
+
+	/**
+	 * Set of experiment data associated with target gene.
+	 */
 	public Set<ExperimentData> targetData;
 
+	/**
+	 * Pathway Commons IDs of the mediator objects for the relation.
+	 */
 	private String mediators;
 
+	/**
+	 * A change detector that can evaluate pairs of experiment data to see if this relation can explain the causality
+	 * between them.
+	 */
 	public TwoDataChangeDetector chDet;
 
-	// target sites, used when this is phospho relation.
+	/**
+	 * Sites for the target. Needed when the relation is a phosphorylation or dephosphorylation.
+	 */
 	public Set<PhosphoSite> sites;
 
 	public Relation(String source, String target, RelationType type, String mediators)
@@ -41,11 +66,17 @@ public class Relation
 		targetData = new HashSet<>();
 	}
 
+	/**
+	 * Sign of the relation.
+	 */
 	public int getSign()
 	{
 		return type.sign;
 	}
 
+	/**
+	 * Fills the data resources using the given bag.
+	 */
 	public void pickRelatedExperimentData(Map<String, Set<ExperimentData>> map)
 	{
 		if (map.containsKey(source)) sourceData.addAll(map.get(source));

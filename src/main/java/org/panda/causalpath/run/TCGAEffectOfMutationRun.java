@@ -22,8 +22,6 @@ import java.util.*;
 
 /**
  * Compares samples that are separated by a gene mutation.
- *
- * Created by babur on 4/18/16.
  */
 public class TCGAEffectOfMutationRun
 {
@@ -35,6 +33,7 @@ public class TCGAEffectOfMutationRun
 
 		for (File dir : new File(tcgaDataDir).listFiles())
 		{
+			// DEBUG: run only for one TCGA study
 			if (!dir.getName().equals("BRCA")) continue;
 
 			if (Files.exists(Paths.get(dir.getPath() + "/rppa.txt")) &&
@@ -59,6 +58,7 @@ public class TCGAEffectOfMutationRun
 
 				for (String gene : select)
 				{
+					// DEBUG: run only for one gene mutation
 //					if (!gene.equals("PIK3CA")) continue;
 
 					String outFile = outDir.getPath() + "/" + gene + ".sif";

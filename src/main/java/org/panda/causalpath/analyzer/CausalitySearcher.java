@@ -8,24 +8,44 @@ import org.panda.utility.CollectionUtil;
 import java.util.*;
 
 /**
- * This class known which experiments data types can be used to detect causality for which
- * relation types.
- *
- * Created by babur on 4/5/16.
+ * This class matches the experiment data with the pathway relations, and detect potential causality.
  */
 public class CausalitySearcher
 {
-	// phospho relations only
+	/**
+	 * Data types to explain phosphorylations.
+	 */
 	static Set<Class<? extends ExperimentData>> pSet = Collections.singleton(PhosphoProteinData.class);
 
-	// expression relations only
+	/**
+	 * Data types to explain total protein changes.
+	 */
 //	static Set<Class<? extends ExperimentData>> eSet = new HashSet<>(Arrays.asList(ProteinData.class, ExpressionData.class));
 	static Set<Class<? extends ExperimentData>> eSet = Collections.singleton(ProteinData.class);
 
+	/**
+	 * Parameter to mandate site matching to explain phosphorylations.
+	 */
 	private boolean forceSiteMatching = true;
+
+	/**
+	 * Parameter to include phospho sites with unknown effect.
+	 */
 	private boolean addInUnknownSigns = false;
+
+	/**
+	 * Sometimes a site with unknown effect, but also very close to another site with known effect, is very likely to
+	 * have the same effect. This parameter is the site proximity threshold to infer the effect of sites with neighbor
+	 * sites.
+	 */
 	private int siteProximityThreshold = 0;
+
+	/**
+	 * When there is a total protein measurement for a gene, we may prefer it to override its RNA expression data. This
+	 * set is used to mark those proteins whose RNA expression will be ignored in the analysis.
+	 */
 	private Set<String> genesWithTotalProteinData;
+
 	/**
 	 * If that is false, then we are interested in conflicting relations.
 	 */
@@ -72,6 +92,9 @@ public class CausalitySearcher
 		return selected;
 	}
 
+	/**
+	 * Checks if the experiment data needs to be ignored because there is a total protein data.
+	 */
 	private boolean skip(ExperimentData data, String gene)
 	{
 		return genesWithTotalProteinData != null && genesWithTotalProteinData.contains(gene) &&

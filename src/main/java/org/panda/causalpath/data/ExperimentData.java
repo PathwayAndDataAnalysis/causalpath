@@ -6,18 +6,34 @@ import java.util.Collections;
 import java.util.Set;
 
 /**
- * Created by babur on 3/24/16.
+ * Base class for a series of experiment data for a gene.
  */
 public abstract class ExperimentData
 {
+	/**
+	 * ID of the measurement. This can be an identifier of the antibody in an RPPA experiment, or gene symbol for a
+	 * mutation, or an identifier for a mass spectometry peak.
+	 */
 	public String id;
+
+	/**
+	 * List of gene symbols that the measurement applies.
+	 */
 	protected Set<String> geneSymbols;
 
+	/**
+	 * How does a positive value in this experiment data affects the gene's activity? Only negative example is
+	 * methylation so far.
+	 */
 	public int getEffect()
 	{
 		return 1;
 	}
 
+	/**
+	 * A plug-in detector for the change in the experiment data. This detector may compare a test and a control group,
+	 * or can decide based on a threshold, etc.
+	 */
 	protected OneDataChangeDetector chDet;
 
 	public ExperimentData(String id, Set<String> geneSymbols)

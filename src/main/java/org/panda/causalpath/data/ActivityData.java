@@ -1,9 +1,9 @@
 package org.panda.causalpath.data;
 
-import org.panda.resource.tcga.RPPAData;
+import org.panda.resource.tcga.ProteomicsFileRow;
 
 /**
- * Created by babur on 3/25/16.
+ * Array of activity values for a gene.
  */
 public class ActivityData extends CategoricalData
 {
@@ -12,10 +12,14 @@ public class ActivityData extends CategoricalData
 		super(id, symbol);
 	}
 
-	public ActivityData(RPPAData rppa)
+	/**
+	 * This constructor is for converting the activity-encoding RPPAData in the resource module to an activity data to
+	 * use in this project.
+	 */
+	public ActivityData(ProteomicsFileRow rppa)
 	{
 		super(rppa.id, rppa.genes.iterator().next());
-		data = new SingleQData[rppa.vals.length];
+		data = new SingleCategoricalData[rppa.vals.length];
 		for (int i = 0; i < data.length; i++)
 		{
 			data[i] = new Activity((int) rppa.vals[i]);

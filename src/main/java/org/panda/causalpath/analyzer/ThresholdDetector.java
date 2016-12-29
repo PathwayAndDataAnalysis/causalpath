@@ -7,8 +7,6 @@ import org.panda.utility.ArrayUtil;
 
 /**
  * Detects a change if the absolute of mean value is over the threshold.
- *
- * Created by babur on 3/24/16.
  */
 public class ThresholdDetector implements OneDataChangeDetector
 {

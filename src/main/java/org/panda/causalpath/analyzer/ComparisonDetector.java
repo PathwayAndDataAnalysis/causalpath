@@ -2,8 +2,6 @@ package org.panda.causalpath.analyzer;
 
 /**
  * Base class for change detectors that compare two group of values.
- *
- * Created by babur on 3/24/16.
  */
 public abstract class ComparisonDetector extends ThresholdDetector
 {

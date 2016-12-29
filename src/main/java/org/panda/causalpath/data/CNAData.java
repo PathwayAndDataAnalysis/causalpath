@@ -1,7 +1,7 @@
 package org.panda.causalpath.data;
 
 /**
- * Created by babur on 4/5/16.
+ * Series of copy number alterations for a gene.
  */
 public class CNAData extends CategoricalData
 {

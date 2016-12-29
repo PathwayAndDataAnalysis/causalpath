@@ -12,19 +12,22 @@ import org.panda.utility.statistics.Correlation;
 import java.util.List;
 
 /**
- * Change detection for experiment data pairs based on their correlation.
- *
- * Created by babur on 3/24/16.
+ * Change detector for experiment data pairs based on their correlation.
  */
 public class CorrelationDetector implements TwoDataChangeDetector
 {
+	/**
+	 * Absolute value of the minimum correlation to be detected.
+	 */
 	protected double correlationThreshold;
+
+	/**
+	 * Significance threshold for correlations to be detected.
+	 */
 	protected double pvalThreshold;
 
 	/**
 	 * If no threshold is needed, pass -1 for that threshold.
-	 * @param correlationThreshold
-	 * @param pvalThreshold
 	 */
 	public CorrelationDetector(double correlationThreshold, double pvalThreshold)
 	{
@@ -45,6 +48,8 @@ public class CorrelationDetector implements TwoDataChangeDetector
 	@Override
 	public int getChangeSign(ExperimentData data1, ExperimentData data2)
 	{
+		// Case 1: Both data are numeric
+
 		if (data1 instanceof NumericData && data2 instanceof NumericData)
 		{
 			NumericData nd1 = (NumericData) data1;
@@ -63,6 +68,9 @@ public class CorrelationDetector implements TwoDataChangeDetector
 			if (correlationThreshold > 0 && Math.abs(corr.v) < correlationThreshold) return 0;
 			return (int) Math.signum(corr.v);
 		}
+
+		// Case 2: One data is numeric, the other is categorical
+
 		else if (data1 instanceof CategoricalData && data2 instanceof NumericData ||
 			data2 instanceof CategoricalData && data1 instanceof NumericData)
 		{
@@ -90,6 +98,9 @@ public class CorrelationDetector implements TwoDataChangeDetector
 //			double[][] two = ArrayUtil.separateToBalancedTwo(groups);
 //			return ArrayUtil.diffOfMeans(two[0], two[1]) > 0 ? 1 : -1;
 		}
+
+		// Case 3: Both data are categorical
+
 		else if (data1 instanceof CategoricalData && data2 instanceof CategoricalData)
 		{
 			CategoricalData qd1 = (CategoricalData) data1;

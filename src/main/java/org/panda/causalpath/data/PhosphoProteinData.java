@@ -1,15 +1,18 @@
 package org.panda.causalpath.data;
 
-import org.panda.resource.tcga.RPPAData;
+import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Created by babur on 3/24/16.
+ * Data specific to protein phosphorylation.
  */
 public class PhosphoProteinData extends ProteinData
 {
+	/**
+	 * Map from gene symbols to corresponding sites on proteins.
+	 */
 	protected Map<String, Set<PhosphoSite>> siteMap;
 
 	public PhosphoProteinData(String id, Set<String> geneSymbols)
@@ -17,19 +20,25 @@ public class PhosphoProteinData extends ProteinData
 		super(id, geneSymbols);
 	}
 
-	public PhosphoProteinData(RPPAData rppa)
+	/**
+	 * Constructor to convert an RPPAData object from the "resource" project.
+	 */
+	public PhosphoProteinData(ProteomicsFileRow row)
 	{
-		super(rppa);
+		super(row);
 
 		siteMap = new HashMap<>();
 
-		rppa.sites.keySet().stream().forEach(sym ->
-			siteMap.put(sym, rppa.sites.get(sym).stream().map(site ->
+		row.sites.keySet().stream().forEach(sym ->
+			siteMap.put(sym, row.sites.get(sym).stream().map(site ->
 				new PhosphoSite(Integer.parseInt(site.substring(1)), site.substring(0, 1),
-					rppa.effect == null ? 0 : rppa.effect == RPPAData.SiteEffect.ACTIVATING ? 1 :
-					rppa.effect == RPPAData.SiteEffect.INHIBITING ? -1 : 0)).collect(Collectors.toSet())));
+					row.effect == null ? 0 : row.effect == ProteomicsFileRow.SiteEffect.ACTIVATING ? 1 :
+					row.effect == ProteomicsFileRow.SiteEffect.INHIBITING ? -1 : 0)).collect(Collectors.toSet())));
 	}
 
+	/**
+	 * Effect of this data depends on the effect of the phospho site.
+	 */
 	@Override
 	public int getEffect()
 	{
@@ -41,6 +50,9 @@ public class PhosphoProteinData extends ProteinData
 		return 0;
 	}
 
+	/**
+	 * Gets string that shows genes with their sites in a set.
+	 */
 	public Set<String> getGenesWithSites()
 	{
 		if (siteMap == null) return Collections.emptySet();

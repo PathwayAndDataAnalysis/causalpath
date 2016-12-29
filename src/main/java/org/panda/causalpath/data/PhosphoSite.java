@@ -1,11 +1,18 @@
 package org.panda.causalpath.data;
 
 /**
- * Created by babur on 3/24/16.
+ * A phosphorylation site of a protein.
  */
 public class PhosphoSite
 {
+	/**
+	 * Location on the protein.
+	 */
 	protected int site;
+
+	/**
+	 * The effect on protein activity when it is phosphorylated.
+	 */
 	protected int effect;
 
 	/**

@@ -1,17 +1,21 @@
 package org.panda.causalpath.data;
 
 /**
- * Created by babur on 3/24/16.
+ * Holds an array of categorical data points.
  */
 public abstract class CategoricalData extends ExperimentData
 {
-	public SingleQData[] data;
+	public SingleCategoricalData[] data;
 
 	public CategoricalData(String id, String symbol)
 	{
 		super(id, symbol);
 	}
 
+	/**
+	 * Sometimes we need the data array to be less structured for practical purposes. This method represents the
+	 * category array as an integer array.
+	 */
 	public int[] getCategories()
 	{
 		int[] c = new int[data.length];

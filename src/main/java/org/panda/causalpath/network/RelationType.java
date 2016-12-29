@@ -1,7 +1,7 @@
 package org.panda.causalpath.network;
 
 /**
- * Created by babur on 3/24/16.
+ * Enumeration of the relation types used in the causality framework.
  */
 public enum RelationType
 {
@@ -10,9 +10,24 @@ public enum RelationType
 	PHOSPHORYLATES("phosphorylates", 1, true, false),
 	DEPHOSPHORYLATES("dephosphorylates", -1, true, false);
 
+	/**
+	 * Whether the relation can explain a change in phosphorylation.
+	 */
 	public boolean affectsPhosphoSite;
+
+	/**
+	 * Whether the relation can explain a change in total protein.
+	 */
 	public boolean affectsTotalProt;
+
+	/**
+	 * Sign of the relation: positive (1) or negative (-1).
+	 */
 	public int sign;
+
+	/**
+	 * The name of the relation will be used in the generated SIF graph.
+	 */
 	public String name;
 
 	RelationType(String name, int sign, boolean affectsPhosphoSite, boolean affectsTotalProt)
