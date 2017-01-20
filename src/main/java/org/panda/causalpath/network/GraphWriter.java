@@ -1,17 +1,21 @@
 package org.panda.causalpath.network;
 
+import com.github.jsonldjava.utils.JsonUtils;
 import org.panda.causalpath.data.*;
 import org.panda.causalpath.resource.MutationClassifier;
+import org.panda.utility.CollectionUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.ValToColor;
 
 import java.awt.*;
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.List;
 
 /**
  * This class prepares the causality graph in two files, to display in ChiBE.
@@ -80,9 +84,10 @@ public class GraphWriter
 
 	/**
 	 * Produces a causality graph where each node corresponds to a gene. In this graph, data may be displayed more than
-	 * once if they map to more than one gene.
+	 * once if they map to more than one gene. The output .sif and .format files can be visualized using ChiBE. From
+	 * ChiBE, do SIF -> Load SIF File ... and select the output .sif file.
 	 */
-	public void writeGeneCentric(String filename) throws IOException
+	public void writeSIFGeneCentric(String filename) throws IOException
 	{
 		if (!filename.endsWith(".sif")) filename += ".sif";
 
@@ -172,10 +177,18 @@ public class GraphWriter
 	}
 
 	/**
+	 * Converts color to a JSON string.
+	 */
+	private String inJSONString(Color c)
+	{
+		return "rgb(" + c.getRed() + "," + c.getGreen() + "," + c.getBlue() + ")";
+	}
+
+	/**
 	 * Generates a causality graph where each node is a measurement. In this graph, pathway relations can be displayed
 	 * more than once if the same relation can explain more than one data pairs.
 	 */
-	public void writeDataCentric(String filename) throws IOException
+	public void writeSIFDataCentric(String filename) throws IOException
 	{
 		if (!filename.endsWith(".sif")) filename += ".sif";
 
@@ -193,5 +206,129 @@ public class GraphWriter
 					writer2));
 
 		writer2.close();
+	}
+
+	/**
+	 * Writes the graph in JSON format, which can be viewed using the web-based proteomics analysis tool.
+	 */
+	public void writeJSON(String filename) throws IOException
+	{
+		if (!filename.endsWith(".json")) filename += ".json";
+
+		Map<String, Object> map = new HashMap<>();
+		List<Map> nodes = new ArrayList<>();
+		List<Map> edges = new ArrayList<>();
+		map.put("nodes", nodes);
+		map.put("edges", edges);
+
+		Map<String, Map> geneMap = new HashMap<>();
+		Set<String> relMem = new HashSet<>();
+
+		relations.forEach(rel ->
+		{
+			String key = rel.relation.source + "\t" + rel.relation.type.name + "\t" + rel.relation.target;
+			if (relMem.contains(key)) return;
+			else relMem.add(key);
+
+			Map<String, Object> edge = new HashMap<>();
+			edges.add(edge);
+			Map<String, Object> dMap = new HashMap<>();
+			edge.put("data", dMap);
+			dMap.put("source", rel.relation.source);
+			dMap.put("target", rel.relation.target);
+			dMap.put("edgeType", rel.relation.type.name);
+			dMap.put("tooltipText", CollectionUtil.merge(rel.relation.getTargetWithSites(0), ", "));
+		});
+
+		Set<String> totalProtUsedUp = new HashSet<>();
+
+		relations.stream().map(r -> new ExperimentData[]{r.source, r.target}).flatMap(Arrays::stream).distinct()
+			.forEach(data ->
+			{
+				String colS = "255 255 255";
+				String bor = "0 0 0";
+				String let = "x";
+
+				if (data.hasChangeDetector())
+				{
+					if (data.getChangeSign() != 0) colS = vtc.getColorInJSONString(data.getChangeValue());
+				}
+
+				if (data instanceof PhosphoProteinData)
+				{
+					PhosphoProteinData pd = (PhosphoProteinData) data;
+					if (pd.getEffect() > 0) bor = inJSONString(activatingBorderColor);
+					else if (pd.getEffect() < 0) bor = inJSONString(inhibitingBorderColor);
+
+					let = "p";
+				}
+				else if (data instanceof ProteinData)
+				{
+					let = "t";
+				}
+				else if (data instanceof MutationData)
+				{
+					let = "m";
+					if (data.getGeneSymbols().stream().anyMatch(MutationClassifier::isActivatedByMutation))
+						bor = inJSONString(activatingBorderColor);
+					else bor = inJSONString(inhibitingBorderColor);
+				}
+				else if (data instanceof CNAData)
+				{
+					let = "c";
+				}
+				else if (data instanceof ExpressionData)
+				{
+					let = "r";
+				}
+				else if (data instanceof ActivityData)
+				{
+					let = "a";
+					bor = inJSONString(activatingBorderColor);
+				}
+
+				String tooltip = data.id;
+				if (data.hasChangeDetector()) tooltip += ", " + data.getChangeValue();
+
+				for (String sym : data.getGeneSymbols())
+				{
+					if (!geneMap.containsKey(sym))
+					{
+						HashMap<String, Object> node = new HashMap<>();
+						geneMap.put(sym, node);
+						nodes.add(node);
+						Map<String, Object> d = new HashMap<>();
+						node.put("data", d);
+						d.put("id", sym);
+						d.put("text", sym);
+						List<Map> sites = new ArrayList<>();
+						d.put("sites", sites);
+					}
+
+					Map node = geneMap.get(sym);
+
+					if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(sym))
+					{
+						if (!node.containsKey("css")) node.put("css", new HashMap<>());
+						((Map) node.get("css")).put("backgroundColor", colS);
+						((Map) node.get("data")).put("tooltipText", tooltip);
+						totalProtUsedUp.add(sym);
+					}
+					else
+					{
+						Map site = new HashMap();
+						((List) ((Map) node.get("data")).get("sites")).add(site);
+
+						site.put("siteText", let);
+						site.put("siteInfo", tooltip);
+						site.put("siteBackgroundColor", colS);
+						site.put("siteBorderColor", bor);
+					}
+				}
+			});
+
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get(filename));
+		JsonUtils.writePrettyPrint(writer, map);
+		writer.close();
 	}
 }

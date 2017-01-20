@@ -104,6 +104,11 @@ public class Relation
 		return set;
 	}
 
+	public void setChDet(TwoDataChangeDetector chDet)
+	{
+		this.chDet = chDet;
+	}
+
 	@Override
 	public int hashCode()
 	{

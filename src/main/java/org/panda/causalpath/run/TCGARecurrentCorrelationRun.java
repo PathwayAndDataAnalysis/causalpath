@@ -69,7 +69,7 @@ public class TCGARecurrentCorrelationRun
 				System.out.println("causal.size() = " + causal.size());
 				GraphWriter writer = new GraphWriter(causal);
 				writer.setUseGeneBGForTotalProtein(false);
-				writer.writeGeneCentric(outFile);
+				writer.writeSIFGeneCentric(outFile);
 			}
 		}
 
@@ -90,7 +90,7 @@ public class TCGARecurrentCorrelationRun
 		{
 			GraphWriter writer = new GraphWriter(grouped.get(i));
 			writer.setUseGeneBGForTotalProtein(false);
-			writer.writeGeneCentric(recurrent + i + ".sif");
+			writer.writeSIFGeneCentric(recurrent + i + ".sif");
 		}
 
 		k.stop();

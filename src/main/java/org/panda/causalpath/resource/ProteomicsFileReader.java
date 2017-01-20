@@ -5,6 +5,7 @@ import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.PhosphoProteinData;
 import org.panda.causalpath.data.ProteinData;
 import org.panda.resource.tcga.ProteomicsFileRow;
+import org.panda.utility.ArrayUtil;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -34,6 +35,8 @@ import java.util.stream.Collectors;
  */
 public class ProteomicsFileReader
 {
+	protected final static double LOG2 = Math.log(2);
+
 	/**
 	 * Reads the annotation in a given proteomics file.
 	 *
@@ -167,12 +170,10 @@ public class ProteomicsFileReader
 	 * @param missingVal what to use if a value is missing
 	 */
 	public static void addValues(List<ProteomicsFileRow> datas, String filename, String idColName,
-		List<String> vals, Double missingVal)
+		List<String> vals, Double missingVal, boolean logTransform)
 	{
 		Map<String, Double>[] v = readVals(
 			filename, idColName, vals.toArray(new String[vals.size()]));
-
-		List<ProteomicsFileRow> remove = new ArrayList<>();
 
 		for (ProteomicsFileRow data : datas)
 		{
@@ -180,12 +181,14 @@ public class ProteomicsFileReader
 			for (int i = 0; i < v.length; i++)
 			{
 				Double doubVal = v[i].get(data.id);
-				if (doubVal != null) data.vals[i] = doubVal;
-				else if (missingVal == null) remove.add(data);
+				if (doubVal != null)
+				{
+					data.vals[i] = logTransform ? Math.log(doubVal) / LOG2 : doubVal;
+				}
+				else if (missingVal == null) data.vals[i] = Double.NaN;
 				else data.vals[i] = missingVal;
 			}
 		}
-		datas.removeAll(remove);
 	}
 
 	public static int getPotentialIDColIndex(String[] header)

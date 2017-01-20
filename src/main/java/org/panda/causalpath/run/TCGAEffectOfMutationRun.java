@@ -95,7 +95,7 @@ public class TCGAEffectOfMutationRun
 
 						GraphWriter writer = new GraphWriter(causal);
 						writer.setUseGeneBGForTotalProtein(true);
-						writer.writeGeneCentric(outFile);
+						writer.writeSIFGeneCentric(outFile);
 					}
 				}
 			}

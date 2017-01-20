@@ -10,11 +10,26 @@ import org.panda.utility.ArrayUtil;
  */
 public class ThresholdDetector implements OneDataChangeDetector
 {
+	/**
+	 * Threshold to use.
+	 */
 	protected double threshold;
+
+	/**
+	 * Whether to use the geometric mean for averaging the values. THis is false by default and only makes sense if the
+	 * values are some kind of ratios.
+	 */
+	protected boolean geometricMean;
 
 	public ThresholdDetector(double threshold)
 	{
 		this.threshold = threshold;
+		this.geometricMean = false;
+	}
+
+	public void setGeometricMean(boolean geometricMean)
+	{
+		this.geometricMean = geometricMean;
 	}
 
 	@Override
@@ -30,7 +45,7 @@ public class ThresholdDetector implements OneDataChangeDetector
 		if (data instanceof NumericData)
 		{
 			NumericData nd = (NumericData) data;
-			return ArrayUtil.mean(nd.vals);
+			return geometricMean ? ArrayUtil.geometricMean(nd.vals) : ArrayUtil.mean(nd.vals);
 		}
 		else if (data instanceof CategoricalData)
 		{

@@ -6,6 +6,7 @@ import org.panda.causalpath.network.RelationAndSelectedData;
 import org.panda.utility.CollectionUtil;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * This class matches the experiment data with the pathway relations, and detect potential causality.
@@ -90,6 +91,48 @@ public class CausalitySearcher
 			}
 		}
 		return selected;
+	}
+
+	/**
+	 * Finds the sites with unknown effect, whose determination of effect can make the result graph larger.
+	 */
+	public Set<ExperimentData> findDataThatNeedsAnnotation(Set<Relation> relations, Set<RelationAndSelectedData> selected)
+	{
+		// Find the genes with a downstream in the results.
+		Set<String> usedGene = selected.stream().map(r -> r.source.id).collect(Collectors.toSet());
+
+		// The data we want to identify
+		Set<ExperimentData> datas = new HashSet<>();
+
+		for (Relation relation : relations)
+		{
+			if (usedGene.contains(relation.source)) continue;
+
+			for (ExperimentData source : relation.sourceData)
+			{
+				if (skip(source, relation.source)) continue;
+
+				for (ExperimentData target : relation.targetData)
+				{
+					if (skip(target, relation.target)) continue;
+					if (relation.type.affectsPhosphoSite && !pSet.contains(target.getClass())) continue;
+					if (relation.type.affectsTotalProt && !eSet.contains(target.getClass())) continue;
+
+					// Check if site-matching constraint holds
+					if (forceSiteMatching && relation.type.affectsPhosphoSite && target instanceof PhosphoProteinData &&
+						CollectionUtil.intersectionEmpty(relation.getTargetWithSites(siteProximityThreshold),
+							((PhosphoProteinData) target).getGenesWithSites())) continue;
+
+					int chgSign = relation.chDet.getChangeSign(source, target) * relation.getSign();
+
+					if (chgSign != 0 && source.getEffect() == 0)
+					{
+						datas.add(source);
+					}
+				}
+			}
+		}
+		return datas;
 	}
 
 	/**

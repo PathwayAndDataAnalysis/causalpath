@@ -34,14 +34,14 @@
 					<artifactId>maven-assembly-plugin</artifactId>
 					<version>2.2-beta-5</version>
 					<configuration>
-						<finalName>mutex</finalName>
+						<finalName>causalpath</finalName>
 						<appendAssemblyId>false</appendAssemblyId>
 						<descriptorRefs>
 							<descriptorRef>jar-with-dependencies</descriptorRef>
 						</descriptorRefs>
 						<archive>
 							<manifest>
-								<mainClass>org.panda.causalpath.run.RPPAFrontFace</mainClass>
+								<mainClass>org.panda.causalpath.run.Main</mainClass>
 								<addClasspath>true</addClasspath>
 							</manifest>
 						</archive>
@@ -83,6 +83,11 @@
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-io</artifactId>
 			<version>1.3.2</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.jsonld-java</groupId>
+			<artifactId>jsonld-java</artifactId>
+			<version>0.7.0</version>
 		</dependency>
 	</dependencies>
 
