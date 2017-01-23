@@ -18,3 +18,5 @@ java -jar target/causalpath.jar path/to/input/directory
 The input directory has to contain a `parameters.txt` file which provides the necessary parameters and links to the input data files. Please refer to [this page](todo) for preparation of inputs.
 
 After CausalPath runs on your input data, it generates output in the same input directory where the `parameters.txt` is. Among those output files, `causal.sif` and `causal.format` are two files that ChiBE needs for displaying the result graph. To display, please open ChiBE and from the menu, do `SIF -> Load SIF File`. Navigate to the directory and select `causal.sif`. 
+
+A manuscript for this method is currently under preparation.
