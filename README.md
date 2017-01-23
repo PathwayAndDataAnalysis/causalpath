@@ -13,7 +13,7 @@ mvn assembly:single
 ```
 The last command should create `causalpath.jar` under `causalpath/target` directory. Then you can run the code by
 ```
-java -jar causalpath.jar path/to/input/directory
+java -jar target/causalpath.jar path/to/input/directory
 ```
 The input directory has to contain a `parameters.txt` file which provides the necessary parameters and links to the input data files. Please refer to [this page](todo) for preparation of inputs.
 
