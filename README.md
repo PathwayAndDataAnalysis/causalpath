@@ -6,4 +6,9 @@ We provide this tool as a web service in the below link:
 
 Alternatively, users can locally run this Java code on their datasets, and visualize the results in ChiBE. To get a copy of the project, please do:
 
-git pull 
+```
+git pull https://github.com/PathwayAndDataAnalysis/causalpath.git
+cd causalpath
+mvn clean install
+mvn assembly:single
+```
