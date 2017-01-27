@@ -1,5 +1,7 @@
 # CausalPath
-This is a tool for pathway analysis of proteomics and phosphoproteomics datasets. CausalPath aims to identify all pathway relations that can explain observed correlations in experiments. 
+This is a tool for pathway analysis of proteomics and phosphoproteomics datasets. CausalPath aims to identify mechanistic pathway relations that can explain observed correlations in experiments, as examplified below.
+
+![CausalPath sample output](/wiki/sample.svg "Identifying the reasons for the downregulation of MAPK3 and its downstream effects.")
 
 Please visit our [web-service](http://104.198.75.85:3001/) that runs an instance of CausalPath.
 
