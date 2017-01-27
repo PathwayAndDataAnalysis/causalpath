@@ -5,7 +5,9 @@ This is a tool for pathway analysis of proteomics and phosphoproteomics datasets
 
 Please visit our [web-service](http://104.198.75.85:3001/) that runs an instance of CausalPath.
 
-Alternatively, users can locally run this Java code on their datasets, and visualize the results in [ChiBE](https://github.com/PathwayCommons/chibe). To get a copy of the project and build it, first make sure you have [git](https://git-scm.com/downloads), [maven](https://maven.apache.org/download.cgi) and [JDK8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html) in your system, then while in your projects folder, do:
+Alternatively, users can locally run this Java code on their datasets, and visualize the results in [ChiBE](https://github.com/PathwayCommons/chibe). But in any case, to use this tool, users need to [prepare input files](wiki/InputFormat.md) to feed into the analysis.
+
+To get a copy of the project and build it, first make sure you have [git](https://git-scm.com/downloads), [maven](https://maven.apache.org/download.cgi) and [JDK8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html) in your system, then while in your projects folder, do:
 ```
 git pull https://github.com/PathwayAndDataAnalysis/causalpath.git
 cd causalpath
