@@ -1,8 +1,8 @@
 package org.panda.causalpath.network;
 
 import com.github.jsonldjava.utils.JsonUtils;
+import org.panda.causalpath.analyzer.NetworkSignificanceCalculator;
 import org.panda.causalpath.data.*;
-import org.panda.causalpath.resource.MutationClassifier;
 import org.panda.utility.CollectionUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.ValToColor;
@@ -16,6 +16,8 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This class prepares the causality graph in two files, to display in ChiBE.
@@ -30,6 +32,17 @@ public class GraphWriter
 	 * Border color of inhibiting phosphorylations or mutations.
 	 */
 	private Color inhibitingBorderColor;
+
+	/**
+	 * This color is used when the downstream of a gene suggest it is activated and inhibited at the same time.
+	 */
+	private Color doubleSignificanceBorderColor;
+
+	/**
+	 * Border color of nodes and phosphosites when their activating/inactivating status is not known, or their
+	 * activated/inactivated status is not significant.
+	 */
+	private Color defaultBorderColor;
 
 	/**
 	 * Parameter to use gene background to display the total protein change. If false, then it is displayed on the gene
@@ -47,19 +60,34 @@ public class GraphWriter
 	 */
 	private Set<RelationAndSelectedData> relations;
 
+	private NetworkSignificanceCalculator nsc;
+
 	/**
 	 * Constructor with the relations. Those relations are the result of the causality search.
 	 */
 	public GraphWriter(Set<RelationAndSelectedData> relations)
 	{
+		this(relations, null);
+	}
+
+	/**
+	 * Constructor with the relations and significance calculation results.
+	 * Those relations are the result of the causality search.
+	 */
+	public GraphWriter(Set<RelationAndSelectedData> relations, NetworkSignificanceCalculator nsc)
+	{
 		this.relations = relations;
 		activatingBorderColor = new Color(0, 180, 20);
 		inhibitingBorderColor = new Color(180, 0, 20);
+		doubleSignificanceBorderColor = new Color(80, 80, 20);
+		defaultBorderColor = new Color(50, 50, 50);
 
 		vtc = new ValToColor(new double[]{-1, 0, 1},
 			new Color[]{new Color(40, 80, 255), Color.WHITE, new Color(255, 80, 40)});
 
 		useGeneBGForTotalProtein = false;
+
+		this.nsc = nsc;
 	}
 
 	public void setUseGeneBGForTotalProtein(boolean useGeneBGForTotalProtein)
@@ -101,11 +129,13 @@ public class GraphWriter
 		filename = filename.substring(0, filename.lastIndexOf(".")) + ".format";
 		BufferedWriter writer2 = new BufferedWriter(new FileWriter(filename));
 		writer2.write("node\tall-nodes\tcolor\t255 255 255\n");
-		relations.stream().map(r -> new ExperimentData[]{r.source, r.target}).flatMap(Arrays::stream).distinct()
-			.forEach(data ->
+
+		Set<ExperimentData> dataInGraph = getExperimentDataToDraw();
+
+		dataInGraph.forEach(data ->
 		{
 			String colS = "255 255 255";
-			String bor = "0 0 0";
+			String bor = inString(defaultBorderColor);
 			String let = "x";
 
 			if (data.hasChangeDetector())
@@ -128,7 +158,7 @@ public class GraphWriter
 			else if (data instanceof MutationData)
 			{
 				let = "m";
-				if (data.getGeneSymbols().stream().anyMatch(MutationClassifier::isActivatedByMutation))
+				if (data.getEffect() == 1)
 					bor = inString(activatingBorderColor);
 				else bor = inString(inhibitingBorderColor);
 			}
@@ -138,7 +168,7 @@ public class GraphWriter
 			}
 			else if (data instanceof ExpressionData)
 			{
-				let = "r";
+				let = "e";
 			}
 			else if (data instanceof ActivityData)
 			{
@@ -155,6 +185,20 @@ public class GraphWriter
 				{
 					FileUtil.writeln("node\t" + gene + "\tcolor\t" + colS, writer2);
 					FileUtil.writeln("node\t" + gene + "\ttooltip\t" + tooltip, writer2);
+					if (nsc != null)
+					{
+						if (nsc.isDownstreamSignificant(gene))
+						{
+							FileUtil.writeln("node\t" + gene + "\tborderwidth\t2", writer2);
+						}
+						boolean act = nsc.isActivatingTargetsSignificant(gene);
+						boolean inh = nsc.isInhibitoryTargetsSignificant(gene);
+
+						if (act && !inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(activatingBorderColor), writer2);
+						else if (!act && inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(inhibitingBorderColor), writer2);
+						else if (act /** && inh **/) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(doubleSignificanceBorderColor), writer2);
+						else FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(defaultBorderColor), writer2);
+					}
 					totalProtUsedUp.add(gene);
 				}
 				else
@@ -242,93 +286,114 @@ public class GraphWriter
 
 		Set<String> totalProtUsedUp = new HashSet<>();
 
-		relations.stream().map(r -> new ExperimentData[]{r.source, r.target}).flatMap(Arrays::stream).distinct()
-			.forEach(data ->
+		Set<ExperimentData> dataInGraph = getExperimentDataToDraw();
+
+		dataInGraph.forEach(data ->
+		{
+			String colS = "255 255 255";
+			String bor = inJSONString(defaultBorderColor);
+			String let = "x";
+
+			if (data.hasChangeDetector())
 			{
-				String colS = "255 255 255";
-				String bor = "0 0 0";
-				String let = "x";
+				if (data.getChangeSign() != 0) colS = vtc.getColorInJSONString(data.getChangeValue());
+			}
 
-				if (data.hasChangeDetector())
-				{
-					if (data.getChangeSign() != 0) colS = vtc.getColorInJSONString(data.getChangeValue());
-				}
+			if (data instanceof PhosphoProteinData)
+			{
+				PhosphoProteinData pd = (PhosphoProteinData) data;
+				if (pd.getEffect() > 0) bor = inJSONString(activatingBorderColor);
+				else if (pd.getEffect() < 0) bor = inJSONString(inhibitingBorderColor);
 
-				if (data instanceof PhosphoProteinData)
-				{
-					PhosphoProteinData pd = (PhosphoProteinData) data;
-					if (pd.getEffect() > 0) bor = inJSONString(activatingBorderColor);
-					else if (pd.getEffect() < 0) bor = inJSONString(inhibitingBorderColor);
-
-					let = "p";
-				}
-				else if (data instanceof ProteinData)
-				{
-					let = "t";
-				}
-				else if (data instanceof MutationData)
-				{
-					let = "m";
-					if (data.getGeneSymbols().stream().anyMatch(MutationClassifier::isActivatedByMutation))
-						bor = inJSONString(activatingBorderColor);
-					else bor = inJSONString(inhibitingBorderColor);
-				}
-				else if (data instanceof CNAData)
-				{
-					let = "c";
-				}
-				else if (data instanceof ExpressionData)
-				{
-					let = "r";
-				}
-				else if (data instanceof ActivityData)
-				{
-					let = "a";
+				let = "p";
+			}
+			else if (data instanceof ProteinData)
+			{
+				let = "t";
+			}
+			else if (data instanceof MutationData)
+			{
+				let = "m";
+				if (data.getEffect() == 1)
 					bor = inJSONString(activatingBorderColor);
-				}
+				else bor = inJSONString(inhibitingBorderColor);
+			}
+			else if (data instanceof CNAData)
+			{
+				let = "c";
+			}
+			else if (data instanceof ExpressionData)
+			{
+				let = "e";
+			}
+			else if (data instanceof ActivityData)
+			{
+				let = "a";
+				bor = inJSONString(activatingBorderColor);
+			}
 
-				String tooltip = data.id;
-				if (data.hasChangeDetector()) tooltip += ", " + data.getChangeValue();
+			String tooltip = data.id;
+			if (data.hasChangeDetector()) tooltip += ", " + data.getChangeValue();
 
-				for (String sym : data.getGeneSymbols())
+			for (String sym : data.getGeneSymbols())
+			{
+				if (!geneMap.containsKey(sym))
 				{
-					if (!geneMap.containsKey(sym))
-					{
-						HashMap<String, Object> node = new HashMap<>();
-						geneMap.put(sym, node);
-						nodes.add(node);
-						Map<String, Object> d = new HashMap<>();
-						node.put("data", d);
-						d.put("id", sym);
-						d.put("text", sym);
-						List<Map> sites = new ArrayList<>();
-						d.put("sites", sites);
-					}
-
-					Map node = geneMap.get(sym);
-
-					if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(sym))
-					{
-						if (!node.containsKey("css")) node.put("css", new HashMap<>());
-						((Map) node.get("css")).put("backgroundColor", colS);
-						((Map) node.get("data")).put("tooltipText", tooltip);
-						totalProtUsedUp.add(sym);
-					}
-					else
-					{
-						Map site = new HashMap();
-						((List) ((Map) node.get("data")).get("sites")).add(site);
-
-						site.put("siteText", let);
-						site.put("siteInfo", tooltip);
-						site.put("siteBackgroundColor", colS);
-						site.put("siteBorderColor", bor);
-					}
+					HashMap<String, Object> node = new HashMap<>();
+					geneMap.put(sym, node);
+					nodes.add(node);
+					Map<String, Object> d = new HashMap<>();
+					node.put("data", d);
+					d.put("id", sym);
+					d.put("text", sym);
+					List<Map> sites = new ArrayList<>();
+					d.put("sites", sites);
 				}
-			});
+
+				Map node = geneMap.get(sym);
+
+				if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(sym))
+				{
+					if (!node.containsKey("css")) node.put("css", new HashMap<>());
+					((Map) node.get("css")).put("backgroundColor", colS);
+					((Map) node.get("data")).put("tooltipText", tooltip);
+					totalProtUsedUp.add(sym);
+				}
+				else
+				{
+					Map site = new HashMap();
+					((List) ((Map) node.get("data")).get("sites")).add(site);
+
+					site.put("siteText", let);
+					site.put("siteInfo", tooltip);
+					site.put("siteBackgroundColor", colS);
+					site.put("siteBorderColor", bor);
+				}
+			}
+		});
 
 		BufferedWriter writer = Files.newBufferedWriter(Paths.get(filename));
 		JsonUtils.writePrettyPrint(writer, map);
 		writer.close();
+	}
+
+	private Set<ExperimentData> getExperimentDataToDraw()
+	{
+		Set<ExperimentData> dataInGraph = relations.stream().map(r -> new ExperimentData[]{r.source, r.target})
+			.flatMap(Arrays::stream).collect(Collectors.toSet());
+
+		Set<String> symInGraph = relations.stream().map(r -> new String[]{r.relation.source, r.relation.target})
+			.flatMap(Arrays::stream).collect(Collectors.toSet());
+
+		Set<ExperimentData> otherData = Stream.concat(
+			relations.stream().map(r -> r.relation).map(r -> r.sourceData).flatMap(Collection::stream),
+			relations.stream().map(r -> r.relation).map(r -> r.targetData).flatMap(Collection::stream)).distinct()
+			.filter(d -> (d instanceof ExpressionData || d instanceof CNAData) && !dataInGraph.contains(d))
+			.filter(d -> symInGraph.contains(d.getGeneSymbols().iterator().next()))
+			.filter(d -> d.hasChangeDetector() && d.getChangeSign() != 0)
+			.collect(Collectors.toSet());
+
+		dataInGraph.addAll(otherData);
+		return dataInGraph;
 	}
 }

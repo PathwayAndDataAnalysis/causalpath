@@ -89,4 +89,12 @@ public abstract class ExperimentData
 	{
 		return obj instanceof ExperimentData && ((ExperimentData) obj).id.equals(id);
 	}
+
+	/**
+	 * An experiment data is not site specific by default.
+	 */
+	public boolean isSiteSpecific()
+	{
+		return false;
+	}
 }

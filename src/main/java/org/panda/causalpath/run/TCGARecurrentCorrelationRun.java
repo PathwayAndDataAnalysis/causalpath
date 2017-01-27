@@ -2,6 +2,7 @@ package org.panda.causalpath.run;
 
 import org.panda.causalpath.analyzer.CausalitySearcher;
 import org.panda.causalpath.analyzer.CorrelationDetector;
+import org.panda.causalpath.analyzer.RelationTargetCompatibilityChecker;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationAndSelectedData;
@@ -57,7 +58,7 @@ public class TCGARecurrentCorrelationRun
 						rel.chDet = det;
 					}
 				}
-				CausalitySearcher searcher = new CausalitySearcher();
+				CausalitySearcher searcher = new CausalitySearcher(new RelationTargetCompatibilityChecker());
 //				searcher.setGenesWithTotalProteinData(loader.getGenesWithTotalProteinData());
 				Set<RelationAndSelectedData> causal = searcher.run(rels);
 

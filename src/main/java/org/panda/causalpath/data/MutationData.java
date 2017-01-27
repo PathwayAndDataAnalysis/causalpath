@@ -7,9 +7,17 @@ import org.panda.utility.ArrayUtil;
  */
 public class MutationData extends CategoricalData
 {
-	public MutationData(String id, String symbol)
+	/**
+	 * The effect of the mutation that are represented with this data. If both activating and inhibiting mutations are
+	 * considered in an analysis for the same gene, then different MutationData objects should be created for each
+	 * effect.
+	 */
+	private int effect;
+
+	public MutationData(String id, String symbol, int effect)
 	{
 		super(id, symbol);
+		this.effect = effect;
 	}
 
 	/**
@@ -38,5 +46,17 @@ public class MutationData extends CategoricalData
 			b[i] = data[i].category == 0;
 		}
 		return b;
+	}
+
+	@Override
+	public int getEffect()
+	{
+		return effect;
+	}
+
+	@Override
+	public boolean isSiteSpecific()
+	{
+		return true;
 	}
 }

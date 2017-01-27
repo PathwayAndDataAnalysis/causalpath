@@ -11,6 +11,7 @@ import org.panda.causalpath.network.RelationAndSelectedData;
 import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.causalpath.resource.ProteomicsFileReader;
 import org.panda.causalpath.resource.ProteomicsLoader;
+import org.panda.causalpath.resource.TCGALoader;
 import org.panda.resource.PhosphoSitePlus;
 import org.panda.resource.ResourceDirectory;
 import org.panda.resource.tcga.ProteomicsFileRow;
@@ -37,6 +38,7 @@ public class Main
 	public static final String CAUSATIVE_RESULT_FILE_PREFIX = "causative";
 	public static final String CONFLICTING_RESULT_FILE_PREFIX = "conflicting";
 	public static final String UNKNOWN_SITE_EFFECT_FILENAME = "unknown-site-effects.txt";
+	public static final String SIGNIFICANCE_FILENAME = "significance-pvals.txt";
 
 	public static final String PROTEOMICS_PLATFORM_FILE_KEY = "proteomics-platform-file";
 	public static final String PROTEOMICS_VALUES_FILE_KEY = "proteomics-values-file";
@@ -57,6 +59,10 @@ public class Main
 	public static final String SITE_MATCH_PROXIMITY_THRESHOLD_KEY = "site-match-proximity-threshold";
 	public static final String DEFAULT_MISSING_VALUE_KEY = "default-missing-value";
 	public static final String RELATION_FILTER_TYPE_KEY = "relation-filter-type";
+	public static final String CALCULATE_NETWORK_SIGNIFICANCE_KEY = "calculate-network-significance";
+	public static final String PERMUTATIONS_FOR_SIGNIFICANCE_KEY = "permutations-for-significance";
+	public static final String TCGA_DIRECTORY_KEY = "tcga-directory";
+	public static final String MUTATION_EFFECT_FILE_KEY = "mutation-effect-file";
 
 	/**
 	 * The directory where the parameters.txt file resides in.
@@ -158,6 +164,21 @@ public class Main
 	 */
 	private GraphFilter graphFilter;
 
+	/**
+	 * Parameter for calculating network significances. If this is true, then <code>permutationCount</code> should also
+	 * be set.
+	 */
+	private boolean calculateNetworkSignificance;
+
+	/**
+	 * Number of iterations of permutations to use during network significance calculations.
+	 */
+	private int permutationCount;
+
+	private String tcgaDirectory;
+
+	private String mutationEffectFilename;
+
 	public static void main(String[] args) throws IOException
 	{
 		if (args.length < 1)
@@ -211,6 +232,10 @@ public class Main
 			case SITE_MATCH_PROXIMITY_THRESHOLD_KEY: siteMatchProximityThreshold = Integer.valueOf(value); break;
 			case DEFAULT_MISSING_VALUE_KEY: defaultMissingValue = Double.valueOf(value); break;
 			case RELATION_FILTER_TYPE_KEY: graphFilter = new GraphFilter(value); break;
+			case CALCULATE_NETWORK_SIGNIFICANCE_KEY: calculateNetworkSignificance = Boolean.valueOf(value); break;
+			case PERMUTATIONS_FOR_SIGNIFICANCE_KEY: permutationCount = Integer.valueOf(value); break;
+			case TCGA_DIRECTORY_KEY: tcgaDirectory = value; break;
+			case MUTATION_EFFECT_FILE_KEY: mutationEffectFilename = value; break;
 			default: throw new RuntimeException("Unknown parameter: " + key);
 		}
 	}
@@ -282,9 +307,29 @@ public class Main
 		// Associate change detectors
 		loader.associateChangeDetector(detector, data -> data instanceof ProteinData);
 
+		// Prepare relation-target compatibility checker
+		RelationTargetCompatibilityChecker rtcc = new RelationTargetCompatibilityChecker();
+		rtcc.setForceSiteMatching(true);
+		rtcc.setSiteProximityThreshold(siteMatchProximityThreshold);
+
 		// Load signed relations
 		Set<Relation> relations = NetworkLoader.load();
-		loader.decorateRelations(relations);
+		loader.decorateRelations(relations, rtcc);
+
+		// Load other TCGA profiles if available
+		if (tcgaDirectory != null)
+		{
+			TCGALoader tcga = new TCGALoader(directory + File.separator + tcgaDirectory);
+			tcga.setSamples(vals.toArray(new String[vals.size()]));
+
+			if (mutationEffectFilename != null)
+			{
+				tcga.loadMutationEffectMap(directory + File.separator + mutationEffectFilename);
+			}
+
+			tcga.decorateRelations(relations);
+			tcga.associateChangeDetector(detector, data -> true);
+		}
 
 		if (transformation == ValueTransformation.CORRELATION)
 		{
@@ -297,18 +342,27 @@ public class Main
 		}
 
 		// Prepare causality searcher
-		CausalitySearcher cs = new CausalitySearcher();
-		cs.setForceSiteMatching(true);
-		cs.setAddInUnknownSigns(false);
-		cs.setSiteProximityThreshold(siteMatchProximityThreshold);
+		CausalitySearcher cs = new CausalitySearcher(rtcc);
 
 		// Search causal or conflicting relations
 		Set<RelationAndSelectedData> relDat =  cs.run(relations);
 		if (graphFilter != null) relDat = graphFilter.filter(relDat);
-		int causativeSize = relDat.size();
+		int causativeSize = (int) relDat.stream().map(r -> r.relation).distinct().count();
 		System.out.println("Causative relations = " + causativeSize);
 
-		GraphWriter writer = new GraphWriter(relDat);
+		// Significance calculation
+		NetworkSignificanceCalculator nsc = null;
+
+		if (calculateNetworkSignificance && transformation != ValueTransformation.CORRELATION)
+		{
+			nsc = new NetworkSignificanceCalculator(relations, true, siteMatchProximityThreshold, true, graphFilter);
+			nsc.run(permutationCount);
+			nsc.setSignificanceThreshold(thresholdForSignificance);
+			nsc.writeResults(directory + File.separator + SIGNIFICANCE_FILENAME);
+			System.out.println("Graph size pval = " + nsc.getOverallGraphSizePval());
+		}
+
+		GraphWriter writer = new GraphWriter(relDat, nsc);
 		writer.setUseGeneBGForTotalProtein(true);
 
 		// Generate output
@@ -323,9 +377,9 @@ public class Main
 		cs.setCausal(false);
 		relDat =  cs.run(relations);
 		if (graphFilter != null) relDat = graphFilter.filter(relDat);
-		int conflictSize = relDat.size();
+		int conflictSize = (int) relDat.stream().map(r -> r.relation).distinct().count();
 		System.out.println("Conflicting relations = " + conflictSize);
-		writer = new GraphWriter(relDat);
+		writer = new GraphWriter(relDat, null);
 		writer.setUseGeneBGForTotalProtein(true);
 		writer.writeSIFGeneCentric(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
 		writer.writeJSON(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
@@ -333,7 +387,7 @@ public class Main
 		// Estimate false discovery rate.
 		if (causativeSize > 0)
 		{
-			System.out.println("Rough estimation of FDR = " + Math.min(1, conflictSize / (double) causativeSize));
+			System.out.println("conflict / causative ratio = " + conflictSize / (double) causativeSize);
 		}
 	}
 

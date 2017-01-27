@@ -14,32 +14,9 @@ import java.util.stream.Collectors;
 public class CausalitySearcher
 {
 	/**
-	 * Data types to explain phosphorylations.
+	 * If that is false, then we are interested in conflicting relations.
 	 */
-	static Set<Class<? extends ExperimentData>> pSet = Collections.singleton(PhosphoProteinData.class);
-
-	/**
-	 * Data types to explain total protein changes.
-	 */
-//	static Set<Class<? extends ExperimentData>> eSet = new HashSet<>(Arrays.asList(ProteinData.class, ExpressionData.class));
-	static Set<Class<? extends ExperimentData>> eSet = Collections.singleton(ProteinData.class);
-
-	/**
-	 * Parameter to mandate site matching to explain phosphorylations.
-	 */
-	private boolean forceSiteMatching = true;
-
-	/**
-	 * Parameter to include phospho sites with unknown effect.
-	 */
-	private boolean addInUnknownSigns = false;
-
-	/**
-	 * Sometimes a site with unknown effect, but also very close to another site with known effect, is very likely to
-	 * have the same effect. This parameter is the site proximity threshold to infer the effect of sites with neighbor
-	 * sites.
-	 */
-	private int siteProximityThreshold = 0;
+	private boolean causal = true;
 
 	/**
 	 * When there is a total protein measurement for a gene, we may prefer it to override its RNA expression data. This
@@ -47,10 +24,12 @@ public class CausalitySearcher
 	 */
 	private Set<String> genesWithTotalProteinData;
 
-	/**
-	 * If that is false, then we are interested in conflicting relations.
-	 */
-	private boolean causal = true;
+	private RelationTargetCompatibilityChecker rtcc;
+
+	public CausalitySearcher(RelationTargetCompatibilityChecker rtcc)
+	{
+		this.rtcc = rtcc;
+	}
 
 	/**
 	 * Finds compatible or conflicting relations. The relations have to be associated with experiment data. Both the
@@ -72,18 +51,11 @@ public class CausalitySearcher
 				for (ExperimentData target : relation.targetData)
 				{
 					if (skip(target, relation.target)) continue;
-					if (relation.type.affectsPhosphoSite && !pSet.contains(target.getClass())) continue;
-					if (relation.type.affectsTotalProt && ! eSet.contains(target.getClass())) continue;
-
-					// Check if site-matching constraint holds
-					if (forceSiteMatching && relation.type.affectsPhosphoSite && target instanceof PhosphoProteinData &&
-						CollectionUtil.intersectionEmpty(relation.getTargetWithSites(siteProximityThreshold),
-							((PhosphoProteinData) target).getGenesWithSites())) continue;
+					if (!rtcc.isCompatible(source, relation, target)) continue;
 
 					int chgSign = relation.chDet.getChangeSign(source, target);
-					int sign = chgSign * source.getEffect() * relation.getSign() * compatible;
-					boolean causative = addInUnknownSigns ? sign != -1 : sign == 1;
-					if (causative)
+					int sign = chgSign * source.getEffect() * relation.getSign();
+					if (sign == compatible)
 					{
 						selected.add(new RelationAndSelectedData(relation, source, target));
 					}
@@ -115,13 +87,7 @@ public class CausalitySearcher
 				for (ExperimentData target : relation.targetData)
 				{
 					if (skip(target, relation.target)) continue;
-					if (relation.type.affectsPhosphoSite && !pSet.contains(target.getClass())) continue;
-					if (relation.type.affectsTotalProt && !eSet.contains(target.getClass())) continue;
-
-					// Check if site-matching constraint holds
-					if (forceSiteMatching && relation.type.affectsPhosphoSite && target instanceof PhosphoProteinData &&
-						CollectionUtil.intersectionEmpty(relation.getTargetWithSites(siteProximityThreshold),
-							((PhosphoProteinData) target).getGenesWithSites())) continue;
+					if (!rtcc.isCompatible(source, relation, target)) continue;
 
 					int chgSign = relation.chDet.getChangeSign(source, target) * relation.getSign();
 
@@ -141,7 +107,7 @@ public class CausalitySearcher
 	private boolean skip(ExperimentData data, String gene)
 	{
 		return genesWithTotalProteinData != null && genesWithTotalProteinData.contains(gene) &&
-		(data instanceof ExpressionData || data instanceof CNAData);
+			(data instanceof ExpressionData || data instanceof CNAData);
 	}
 
 	public void setGenesWithTotalProteinData(Set<String> genesWithTotalProteinData)
@@ -149,23 +115,8 @@ public class CausalitySearcher
 		this.genesWithTotalProteinData = genesWithTotalProteinData;
 	}
 
-	public void setSiteProximityThreshold(int thr)
-	{
-		this.siteProximityThreshold = thr;
-	}
-
 	public void setCausal(boolean causal)
 	{
 		this.causal = causal;
-	}
-
-	public void setForceSiteMatching(boolean forceSiteMatching)
-	{
-		this.forceSiteMatching = forceSiteMatching;
-	}
-
-	public void setAddInUnknownSigns(boolean add)
-	{
-		this.addInUnknownSigns = add;
 	}
 }

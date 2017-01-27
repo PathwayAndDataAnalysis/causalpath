@@ -1,6 +1,7 @@
 package org.panda.causalpath.run;
 
 import org.panda.causalpath.analyzer.CausalitySearcher;
+import org.panda.causalpath.analyzer.RelationTargetCompatibilityChecker;
 import org.panda.causalpath.analyzer.ThresholdDetector;
 import org.panda.causalpath.data.ActivityData;
 import org.panda.causalpath.data.ProteinData;
@@ -43,7 +44,6 @@ public class CausalityAnalysisSingleMethodInterface
 	 * @param siteMatchStrict option to enforce matching a phosphorylation site in the network with
 	 *                       the annotation of antibody
 	 * @param geneCentric Option to produce a gene-centric or an antibody-centric graph
-	 * @param addInUnknownEffects Option to add the phospho sites with unknown effects as potential cause or conflict
 	 * @param outputFilePrefix If the user provides xxx, then xxx.sif and xxx.format are generated
 	 * @param customNetworkDirectory The directory that the network will be downloaded and SignedPC
 	 *                               directory will be created in. Pass null to use default
@@ -53,7 +53,7 @@ public class CausalityAnalysisSingleMethodInterface
 		String symbolsColumn, String sitesColumn, String effectColumn, String valuesFile,
 		String valueColumn, double valueThreshold, String graphType, boolean siteMatchStrict,
 		int siteMatchProximityThreshold, int siteEffectProximityThreshold, boolean geneCentric,
-		boolean addInUnknownEffects, String outputFilePrefix, String customNetworkDirectory) throws IOException
+		String outputFilePrefix, String customNetworkDirectory) throws IOException
 	{
 		if (customNetworkDirectory != null) ResourceDirectory.set(customNetworkDirectory);
 
@@ -69,7 +69,7 @@ public class CausalityAnalysisSingleMethodInterface
 		PhosphoSitePlus.get().fillInMissingEffect(rows, siteEffectProximityThreshold);
 
 		generateCausalityGraph(rows, valueThreshold, graphType, siteMatchStrict, siteMatchProximityThreshold,
-			geneCentric, addInUnknownEffects, outputFilePrefix);
+			geneCentric, outputFilePrefix);
 	}
 
 	/**
@@ -86,23 +86,25 @@ public class CausalityAnalysisSingleMethodInterface
 	 */
 	public static void generateCausalityGraph(Collection<ProteomicsFileRow> rows, double valueThreshold,
 		String graphType, boolean siteMatchStrict, int siteMatchProximityThreshold, boolean geneCentric,
-		boolean addInUnknownEffects, String outputFilePrefix) throws IOException
+		String outputFilePrefix) throws IOException
 	{
 		ProteomicsLoader loader = new ProteomicsLoader(rows);
 		// Associate change detectors
 		loader.associateChangeDetector(new ThresholdDetector(valueThreshold), data -> data instanceof ProteinData);
 		loader.associateChangeDetector(new ThresholdDetector(0.1), data -> data instanceof ActivityData);
 
+		// Prepare relation-target compatibility checker
+		RelationTargetCompatibilityChecker rtcc = new RelationTargetCompatibilityChecker();
+		rtcc.setForceSiteMatching(siteMatchStrict);
+		rtcc.setSiteProximityThreshold(siteMatchProximityThreshold);
+
 		// Load signed relations
 		Set<Relation> relations = NetworkLoader.load();
-		loader.decorateRelations(relations);
+		loader.decorateRelations(relations, rtcc);
 
 		// Prepare causality searcher
-		CausalitySearcher cs = new CausalitySearcher();
-		cs.setForceSiteMatching(siteMatchStrict);
-		cs.setAddInUnknownSigns(addInUnknownEffects);
+		CausalitySearcher cs = new CausalitySearcher(rtcc);
 		if (graphType.toLowerCase().startsWith("conflict")) cs.setCausal(false);
-		cs.setSiteProximityThreshold(siteMatchProximityThreshold);
 
 		// Search causal or conflicting relations
 		Set<RelationAndSelectedData> relDat =  cs.run(relations);
@@ -120,6 +122,6 @@ public class CausalityAnalysisSingleMethodInterface
 	{
 		generateCausalityGraph("/home/ozgun/Documents/JQ1/abdata-chibe.txt", "ID1", "Symbols", "Sites",
 			"Effect", "/home/ozgun/Documents/JQ1/ovcar4_dif_drug_sig.txt", "change", 0.001,
-			"compatible", true, 0, 0, false, false, "/home/ozgun/Temp/temp", null);
+			"compatible", true, 0, 0, false, "/home/ozgun/Temp/temp", null);
 	}
 }

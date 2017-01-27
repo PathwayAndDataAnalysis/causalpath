@@ -121,4 +121,11 @@ public class Relation
 		return obj instanceof Relation && ((Relation) obj).source.equals(source) &&
 			((Relation) obj).target.equals(target) && ((Relation) obj).type.equals(type);
 	}
+
+	public Relation copy()
+	{
+		Relation cln = new Relation(source, target, type, mediators);
+		cln.sites = sites;
+		return cln;
+	}
 }

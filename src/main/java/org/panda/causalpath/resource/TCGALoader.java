@@ -1,12 +1,16 @@
 package org.panda.causalpath.resource;
 
+import org.panda.causalpath.analyzer.OneDataChangeDetector;
 import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.Relation;
 import org.panda.resource.tcga.*;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Loads experiment data from TCGA files that are downloadable from Broad Firehose.
@@ -59,6 +63,8 @@ public class TCGALoader
 	 */
 	private String[] samples;
 
+	private Map<String, Integer> mutationEffectMap;
+
 	// Names of data files under the TCGA data directory
 
 	private static final String COPY_NUMBER_FILE = "/copynumber.txt";
@@ -69,14 +75,30 @@ public class TCGALoader
 	// todo: Make loading parameterized by passing the types of desired data.
 	public TCGALoader(String dir)
 	{
-//		try{cnaReader = new CNAReader(dir + COPY_NUMBER_FILE, false, 0);} catch (FileNotFoundException e){}
-//		try{expReader = new ExpressionReader(dir + EXPRESSION_FILE);} catch (FileNotFoundException e){}
+		try{cnaReader = new CNAReader(dir + COPY_NUMBER_FILE, false, 0);} catch (FileNotFoundException e){}
+		try{expReader = new ExpressionReader(dir + EXPRESSION_FILE);} catch (FileNotFoundException e){}
 		try{mutReader = new MutationReader(dir + MUTATION_FILE);} catch (IOException e){}
 		try{rppaReader = new RPPAReader(dir + RPPA_FILE);} catch (FileNotFoundException e){}
 		this.samples = getUnionSamples();
 		if (rppaReader != null) rppaCache = new HashMap<>();
 		dataCache = new HashMap<>();
 		genesWithTotalProteinData = findGenesWithTotalProteinData();
+	}
+
+	public void setSamples(String[] samples)
+	{
+		this.samples = samples;
+	}
+
+	public void loadMutationEffectMap(String filename) throws IOException
+	{
+		this.mutationEffectMap = Files.lines(Paths.get(filename)).skip(1).map(l -> l.split("\t"))
+			.collect(Collectors.toMap(t -> t[0], t -> Integer.valueOf(t[1])));
+	}
+
+	public void setMutationEffectMap(Map<String, Integer> mutationEffectMap)
+	{
+		this.mutationEffectMap = mutationEffectMap;
 	}
 
 	/**
@@ -127,9 +149,9 @@ public class TCGALoader
 			}
 		}
 
-		if (mutReader != null)
+		if (mutReader != null && mutationEffectMap != null && mutationEffectMap.containsKey(symbol))
 		{
-			MutationData d = getMutations(symbol, MutationClassifier.isActivatedByMutation(symbol));
+			MutationData d = getMutations(symbol, mutationEffectMap.get(symbol));
 			if (d != null) set.add(d);
 		}
 
@@ -152,14 +174,14 @@ public class TCGALoader
 	/**
 	 * Fetches the mutation data from the reader and prepares for analysis.
 	 * @param gene symbol
-	 * @param activated can we assume mutations of this gene are activating mutations
+	 * @param mutEffectSign is it activating (1) or inhibiting (-1) mutation
 	 */
-	private MutationData getMutations(String gene, boolean activated)
+	private MutationData getMutations(String gene, int mutEffectSign)
 	{
 		List<MutTuple>[] mutsList = mutReader.getMutations(gene, samples);
 		if (mutsList == null) return null;
 
-		MutationData mutData = new MutationData(gene + "-mut", gene);
+		MutationData mutData = new MutationData(gene + "-mut", gene, mutEffectSign);
 		mutData.data = new SingleCategoricalData[samples.length];
 
 		for (int i = 0; i < mutsList.length; i++)
@@ -171,7 +193,7 @@ public class TCGALoader
 			}
 			else if (!mutsList[i].isEmpty())
 			{
-				categ = activated ? 1 : -1;
+				categ = 1;
 			}
 			mutData.data[i] = new Mutation(categ, mutsList[i]);
 		}
@@ -217,4 +239,19 @@ public class TCGALoader
 		return genes;
 	}
 
+	/**
+	 * Puts the given change detector to the data that is filtered by the given selector.
+	 */
+	public void associateChangeDetector(OneDataChangeDetector chDet, DataSelector selector)
+	{
+		dataCache.values().stream().flatMap(Collection::stream).filter(selector::select).forEach(d -> d.setChDet(chDet));
+	}
+
+	/**
+	 * Function to filter experiment data.
+	 */
+	public interface DataSelector
+	{
+		boolean select(ExperimentData data);
+	}
 }

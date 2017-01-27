@@ -2,6 +2,7 @@ package org.panda.causalpath.resource;
 
 import org.panda.causalpath.analyzer.CausalityHelper;
 import org.panda.causalpath.analyzer.OneDataChangeDetector;
+import org.panda.causalpath.analyzer.RelationTargetCompatibilityChecker;
 import org.panda.causalpath.data.ActivityData;
 import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.PhosphoProteinData;
@@ -10,6 +11,7 @@ import org.panda.causalpath.network.Relation;
 import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Coverts the RPPAData in resource project to appropriate objects for this project and serves them.
@@ -50,13 +52,14 @@ public class ProteomicsLoader
 	/**
 	 * Adds the related data to the given relations.
 	 */
-	public void decorateRelations(Set<Relation> relations)
+	public void decorateRelations(Set<Relation> relations, RelationTargetCompatibilityChecker rtcc)
 	{
 		CausalityHelper ch = new CausalityHelper();
 		for (Relation relation : relations)
 		{
 			if (dataMap.containsKey(relation.source)) relation.sourceData.addAll(dataMap.get(relation.source));
-			if (dataMap.containsKey(relation.target)) relation.targetData.addAll(dataMap.get(relation.target));
+			if (dataMap.containsKey(relation.target)) relation.targetData.addAll(dataMap.get(relation.target).stream()
+				.filter(d -> rtcc.isCompatible(null, relation, d)).collect(Collectors.toSet()));
 			relation.chDet = ch;
 		}
 	}

@@ -63,4 +63,20 @@ public class PhosphoProteinData extends ProteinData
 
 		return set;
 	}
+
+	@Override
+	public boolean isSiteSpecific()
+	{
+		return true;
+	}
+
+	public Map<String, Set<PhosphoSite>> getSiteMap()
+	{
+		return siteMap;
+	}
+
+	public void setSiteMap(Map<String, Set<PhosphoSite>> siteMap)
+	{
+		this.siteMap = siteMap;
+	}
 }
