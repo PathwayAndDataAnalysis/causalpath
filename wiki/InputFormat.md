@@ -31,9 +31,11 @@ symbols-column = Symbols
 sites-column = Sites
 effect-column = Effect
 ```
-Why the data file is repeated? The previous section about data file directs to put gene annotations (first 4 columns) and values in the same file, but this doesn't have to be the case. In the case of RPPA experiments, the first 4 columns are constant for each chip, so it should not have to be repeated for each time. In that case, the annotation can stay in a platform file and values can go in another file, with the condition that both will contain the ID column, with the same header.
+Why the data file is repeated? The previous section about data file directs to put gene annotations (first 4 columns) and values in the same file, but this doesn't have to be the case. In the case of RPPA experiments, the first 4 columns are constant for each chip, they don't need to be repeated each time a new measurement is done. In that case, the annotation can stay in a platform file and values can go in another file, with the condition that both will contain the id-column, with the same header.
 
 The names of the columns in the data file can be customized, as long as correctly specified in the parameters file, as above.
+
+If the data file contains a single value column, then it has to be a comparison, like a fold change, or a difference. 
 
 
 
