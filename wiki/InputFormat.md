@@ -96,5 +96,20 @@ threshold-for-data-significance = 0.01
 threshold-for-correlation = 0.5
 ```
 
+The rest of the parameters in the parameters file are optional. Use the below parameter if you want to log-transform the values in the data file, before they go into any other processing.
+```
+do-log-transform = true
+```
+
+Sometimes, relaxing the causality parameters helps exploration of the data by increasing the result size. One way to relax it is to use a proximate site during site matching. For instance if protein A phosphorylates B at S319, but your data contains a change at T321, you may want to extend this A --> B relation to the site 321 as well because it is so close and A is likely to phosphorylate from that site too. To relax the site matching, users need to decide on a proximity threshold, like below.
+```
+site-match-proximity-threshold = 5
+```
+
+Another way to relax causality parameters is to use proximate sites when deciding on a effect of a site which is not known. For instance if we know that protein A has an inhibiting site at T221, and the data has a change for the site S222, but the effect is unknown, users may like to classify the site 222 as inhibiting because it is so close to 221. This is because sites with different effects are more likely to be distant on the protein, like on different domains. To relax it, users need to decide on a proximity threshold for the known site, as shown below.
+```
+site-effect-proximity-threshold = 5
+```
+
 
 ... This page will be completed very soon ...
