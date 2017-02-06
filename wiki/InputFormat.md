@@ -110,6 +110,3 @@ Another way to relax causality parameters is to use proximate sites when decidin
 ```
 site-effect-proximity-threshold = 5
 ```
-
-
-... This page will be completed very soon ...
