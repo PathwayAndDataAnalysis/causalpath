@@ -24,19 +24,34 @@ CausalPath reads the proteomics dataset from a tab-delimited text file where the
 The name of the parameters file have to be `parameters.txt` exactly. Each parameter in this file should be given in a separate line, in the format `parameter-name = parameter-value`. Below is a sample of initial lines in a parameters file, assuming the data is in a file named `ProteomicsData.txt`.
 
 ```
-proteomics-platform-file = ProteomicsData.txt
 proteomics-values-file = ProteomicsData.txt
 id-column = ID
 symbols-column = Symbols
 sites-column = Sites
 effect-column = Effect
 ```
-Why the data file is repeated? The previous section about data file directs to put gene annotations (first 4 columns) and values in the same file, but this doesn't have to be the case. In the case of RPPA experiments, the first 4 columns are constant for each chip, they don't need to be repeated each time a new measurement is done. In that case, the annotation can stay in a platform file and values can go in another file, with the condition that both will contain the id-column, with the same header.
 
 The names of the columns in the data file can be customized, as long as correctly specified in the parameters file, as above.
 
-If the data file contains a single value column, then it has to be a comparison, like a fold change, or a difference. 
+The next essential parameter for the parameters file is the indication of how to use the given value(s) in the data file. Don't forget that the causality analysis makes use of value comparisons, and it can not work with a single column of raw measurements. There has to be a comparison in the values, or this software should be able to make a comparison using the given values. We call this a *value transformation*, whose type should be indicated with the parameter `value-transformation`. Below are its possible values. A parameters file has to contain exactly one of the below lines.
 
+```
+value-transformation = arithmetic-mean
+value-transformation = geometric-mean
+value-transformation = difference-of-means
+value-transformation = fold-change-of-mean
+value-transformation = significant-change-of-mean
+value-transformation = correlation
+```
+**Arithmetic mean:** There is one group of values distributed around zero, and zero means no change. The arithmetic mean of those value columns will be used as the value in the analysis. Users should also supply a threshold value which would mark a significant change. The threshold is supposed to be a positive value, and its mirror negative will be used for downregulations. Number of value columns can be one or more. Below is a sample.
 
+```
+value-transformation = arithmetic-mean
+value-column = sample1
+value-column = sample2
+value-column = sample3
+threshold-for-data-significance = 2.5
+```
+**Geometric mean:** There is one group of values, each value is a fold-change or some other ratio. 
 
 ... This page will be completed very soon ...
