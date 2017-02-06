@@ -76,6 +76,15 @@ control-value-column = sample3
 control-value-column = sample4
 threshold-for-data-significance = 1.5
 ```
+**Significant change of mean:** There are control and test values, where each value is a normalized measurement. CausalPath will do a Student's t-test for comparing tests to the controls. Users need to provide a p-value threshold. Below is an example.
+```
+value-transformation = significant-change-of-mean
+test-value-column = sample1
+test-value-column = sample2
+control-value-column = sample3
+control-value-column = sample4
+threshold-for-data-significance = 0.05
+```
 **Correlation:** There is one group of values, technically more than 3 samples, practically many samples. The Pearson correlation will be used for the value. Users need to provide a positive threshold for the correlation value (between 0 and 1), and another threshold for the p-value of the correlation (between 0 and 1). Below is an example.
 ```
 value-transformation = correlation
