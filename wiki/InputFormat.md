@@ -106,7 +106,7 @@ Sometimes, relaxing the causality parameters helps exploration of the data by in
 site-match-proximity-threshold = 5
 ```
 
-Another way to relax causality parameters is to use proximate sites when deciding on a effect of a site which is not known. For instance if we know that protein A has an inhibiting site at T221, and the data has a change for the site S222, but the effect is unknown, users may like to classify the site 222 as inhibiting because it is so close to 221. This is because sites with different effects are more likely to be distant on the protein, like on different domains. To relax it, users need to decide on a proximity threshold for the known site, as shown below.
+Another way to relax causality parameters is to use proximate sites when deciding on the effect of a site which is not known. For instance if we know that protein A has an inhibiting site at T221, and the data has a change for the site S222, but the effect is unknown, users may like to classify the site 222 as inhibiting because it is so close to 221. This is because sites with different effects are more likely to be distant on the protein, like on different domains. To relax it, users need to decide on a proximity threshold for the known site, as shown below.
 ```
 site-effect-proximity-threshold = 5
 ```
