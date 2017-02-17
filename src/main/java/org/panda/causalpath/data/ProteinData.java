@@ -23,4 +23,12 @@ public class ProteinData extends NumericData
 		this(row.id, new HashSet<>(row.genes));
 		this.vals = row.vals;
 	}
+
+	@Override
+	public ExperimentData copy()
+	{
+		ProteinData copy = new ProteinData(id, getGeneSymbols());
+		copy.vals = vals;
+		return copy;
+	}
 }

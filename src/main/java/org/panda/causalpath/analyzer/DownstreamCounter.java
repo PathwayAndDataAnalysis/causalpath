@@ -49,7 +49,7 @@ public class DownstreamCounter
 		return new Map[]{convertToCounts(total), convertToCounts(activ), convertToCounts(inhib)};
 	}
 
-	private Map<String, Integer> convertToCounts(Map<String, Set<String>> map)
+	protected Map<String, Integer> convertToCounts(Map<String, Set<String>> map)
 	{
 		return map.keySet().stream().collect(Collectors.toMap(s -> s, s -> map.get(s).size()));
 	}

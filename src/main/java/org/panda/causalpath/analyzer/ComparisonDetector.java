@@ -14,4 +14,14 @@ public abstract class ComparisonDetector extends ThresholdDetector
 		this.control = control;
 		this.test = test;
 	}
+
+	public boolean[] getControl()
+	{
+		return control;
+	}
+
+	public boolean[] getTest()
+	{
+		return test;
+	}
 }

@@ -70,6 +70,15 @@ public class PhosphoProteinData extends ProteinData
 		return true;
 	}
 
+	@Override
+	public ExperimentData copy()
+	{
+		PhosphoProteinData copy = new PhosphoProteinData(id, getGeneSymbols());
+		copy.vals = vals;
+		copy.setSiteMap(getSiteMap());
+		return copy;
+	}
+
 	public Map<String, Set<PhosphoSite>> getSiteMap()
 	{
 		return siteMap;

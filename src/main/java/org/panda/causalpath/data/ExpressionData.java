@@ -9,4 +9,12 @@ public class ExpressionData extends NumericData
 	{
 		super(id, symbol);
 	}
+
+	@Override
+	public ExperimentData copy()
+	{
+		ExpressionData copy = new ExpressionData(id, getGeneSymbols().iterator().next());
+		copy.vals = vals;
+		return copy;
+	}
 }

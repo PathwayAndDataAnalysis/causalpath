@@ -45,7 +45,7 @@ public class ThresholdDetector implements OneDataChangeDetector
 		if (data instanceof NumericData)
 		{
 			NumericData nd = (NumericData) data;
-			return geometricMean ? ArrayUtil.geometricMean(nd.vals) : ArrayUtil.mean(nd.vals);
+			return geometricMean ? foldChangeGeometricMean(nd.vals) : ArrayUtil.mean(nd.vals);
 		}
 		else if (data instanceof CategoricalData)
 		{
@@ -53,5 +53,21 @@ public class ThresholdDetector implements OneDataChangeDetector
 			return ArrayUtil.mean(qd.getCategories());
 		}
 		return 0;
+	}
+
+	/**
+	 * Gets the geometric mean of fold change values that is formatted to span the range (-inf, -1], [1, inf).
+	 */
+	public double foldChangeGeometricMean(double[] vals)
+	{
+		double mult = 1;
+		int cnt = 0;
+		for (double val : vals)
+		{
+			if (Double.isNaN(val)) continue;
+			cnt++;
+			mult *= val < 0 ? -1 / val : val;
+		}
+		return Math.pow(mult, 1D / cnt);
 	}
 }

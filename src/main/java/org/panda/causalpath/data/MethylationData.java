@@ -18,4 +18,12 @@ public class MethylationData extends NumericData
 	{
 		return -1;
 	}
+
+	@Override
+	public ExperimentData copy()
+	{
+		MethylationData copy = new MethylationData(id, getGeneSymbols().iterator().next());
+		copy.vals = vals;
+		return copy;
+	}
 }

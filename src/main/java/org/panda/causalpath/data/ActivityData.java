@@ -25,4 +25,10 @@ public class ActivityData extends CategoricalData
 			data[i] = new Activity((int) rppa.vals[i]);
 		}
 	}
+
+	@Override
+	public ExperimentData copy()
+	{
+		return new ActivityData(id, getGeneSymbols().iterator().next());
+	}
 }

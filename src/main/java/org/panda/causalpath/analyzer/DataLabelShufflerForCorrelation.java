@@ -9,20 +9,22 @@ import java.util.stream.Stream;
 
 /**
  * This class is for shuffling the rows of the data. It first converts data in simpler format, then provides shuffling
- * multiple times. Does not support correlation-based runs.
+ * multiple times. This class performs the shuffling assuming the analysis is correlation-based.
  *
  * @author Ozgun Babur
  */
-public class DataLabelShuffler
+public class DataLabelShufflerForCorrelation
 {
 	Set<Relation> relations;
+	Map<Object, Map<Object, Integer>> correlationMap;
 	List<double[]> valuesList;
 	List<SingleCategoricalData[]> catsList;
 	List<NumericData> numDatas;
 	List<CategoricalData> catDatas;
 
-	public DataLabelShuffler(Set<Relation> relations)
+	public DataLabelShufflerForCorrelation(Set<Relation> relations)
 	{
+		initCorrelationMap(relations);
 		this.relations = new HashSet<>();
 
 		Map<String, ExperimentData> dataMap = new HashMap<>();
@@ -35,8 +37,8 @@ public class DataLabelShuffler
 			this.relations.add(copy);
 		}
 
-		CausalityHelper ch = new CausalityHelper();
-		this.relations.forEach(r -> r.setChDet(ch));
+		ChDet det = new ChDet();
+		this.relations.forEach(r -> r.setChDet(det));
 
 		numDatas = Stream.concat(this.relations.stream().map(r -> r.sourceData).flatMap(Collection::stream),
 			this.relations.stream().map(r -> r.targetData).flatMap(Collection::stream))
@@ -47,10 +49,6 @@ public class DataLabelShuffler
 			this.relations.stream().map(r -> r.targetData).flatMap(Collection::stream))
 			.filter(d -> d instanceof CategoricalData).map(d -> (CategoricalData) d).distinct()
 			.collect(Collectors.toList());
-
-		ChDet det = new ChDet();
-		numDatas.forEach(d -> d.setChDet(det));
-		catDatas.forEach(d -> d.setChDet(det));
 
 		valuesList = numDatas.stream().map(d -> d.vals).collect(Collectors.toList());
 		catsList = catDatas.stream().map(d -> d.data).collect(Collectors.toList());
@@ -88,47 +86,54 @@ public class DataLabelShuffler
 		if (dataMap.containsKey(orig.id)) return dataMap.get(orig.id);
 
 		ExperimentData copy = orig.copy();
-
-		if (copy instanceof NumericData)
-		{
-			((NumericData) copy).vals = new double[]{orig.getChangeSign()};
-		}
-		else if (copy instanceof MutationData)
-		{
-			((MutationData) copy).data = new SingleCategoricalData[]{new Mutation(orig.getChangeSign(), null)};
-		}
-		else if (copy instanceof CNAData)
-		{
-			((CNAData) copy).data = new SingleCategoricalData[]{new CNA(orig.getChangeSign())};
-		}
-		else if (copy instanceof ActivityData)
-		{
-			((ActivityData) copy).data = new SingleCategoricalData[]{new Activity(orig.getChangeSign())};
-		}
-
 		dataMap.put(orig.id, copy);
+
 		return copy;
 	}
 
-	class ChDet implements OneDataChangeDetector
+	private void initCorrelationMap(Set<Relation> relations)
 	{
-		@Override
-		public int getChangeSign(ExperimentData data)
+		correlationMap = new HashMap<>();
+
+		// Get experiment data in the relations
+		Set<ExperimentData> datas = Stream.concat(relations.stream().map(r -> r.sourceData),
+			relations.stream().map(r -> r.targetData)).flatMap(Collection::stream).collect(Collectors.toSet());
+
+		TwoDataChangeDetector det = relations.iterator().next().chDet;
+
+		for (ExperimentData d1 : datas)
 		{
-			if (data instanceof NumericData)
+			Object o1 = getInnerData(d1);
+
+			for (ExperimentData d2 : datas)
 			{
-				return (int) ((NumericData) data).vals[0];
-			}
-			else
-			{
-				return ((CategoricalData) data).data[0].getCategory();
+				if (d1.id.compareTo(d2.id) >= 0) continue;
+
+				Object o2 = getInnerData(d2);
+
+				int corr = det.getChangeSign(d1, d2);
+
+				if (!correlationMap.containsKey(o1)) correlationMap.put(o1, new HashMap<>());
+				if (!correlationMap.containsKey(o2)) correlationMap.put(o2, new HashMap<>());
+				correlationMap.get(o1).put(o2, corr);
+				correlationMap.get(o2).put(o1, corr);
 			}
 		}
+	}
 
+	private Object getInnerData(ExperimentData data)
+	{
+		if (data instanceof NumericData) return ((NumericData) data).vals;
+		else if (data != null) return ((CategoricalData) data).data;
+		return null;
+	}
+
+	class ChDet implements TwoDataChangeDetector
+	{
 		@Override
-		public double getChangeValue(ExperimentData data)
+		public int getChangeSign(ExperimentData source, ExperimentData target)
 		{
-			return getChangeSign(data);
+			return correlationMap.get(getInnerData(source)).get(getInnerData(target));
 		}
 	}
 }

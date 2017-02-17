@@ -73,6 +73,16 @@ public abstract class ExperimentData
 		this.chDet = chDet;
 	}
 
+	public OneDataChangeDetector getChDet()
+	{
+		return chDet;
+	}
+
+	public String getId()
+	{
+		return id;
+	}
+
 	public boolean hasChangeDetector()
 	{
 		return this.chDet != null;
@@ -97,4 +107,9 @@ public abstract class ExperimentData
 	{
 		return false;
 	}
+
+	/**
+	 * Generates a copy of the object.
+	 */
+	public abstract ExperimentData copy();
 }

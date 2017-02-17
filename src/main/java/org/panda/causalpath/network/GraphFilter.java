@@ -16,6 +16,8 @@ public class GraphFilter
 	 */
 	private RelationFilterType relationFilterType;
 
+	private Set<String> focusGenes;
+
 	/**
 	 * Constructor with the type of the relation filter.
 	 */
@@ -37,28 +39,58 @@ public class GraphFilter
 		this(RelationFilterType.get(relationFilterString));
 	}
 
+	/**
+	 * Constructor with focus genes to crop the graph.
+	 */
+	public GraphFilter(Set<String> focusGenes)
+	{
+		this.focusGenes = focusGenes;
+		this.relationFilterType = RelationFilterType.NO_FILTER;
+	}
+
 	public Set<RelationAndSelectedData> filter(Set<RelationAndSelectedData> results)
 	{
 		switch (relationFilterType)
 		{
-			case NO_FILTER: return results;
-			case PHOSPHO_ONLY: return results.stream().filter(r -> r.relation.type == RelationType.PHOSPHORYLATES ||
+			case NO_FILTER:
+			case PHOSPHO_ONLY: results = results.stream().filter(r -> r.relation.type == RelationType.PHOSPHORYLATES ||
 				r.relation.type == RelationType.DEPHOSPHORYLATES).collect(Collectors.toSet());
-			case EXPRESSION_ONLY: return results.stream()
+				break;
+			case EXPRESSION_ONLY: results = results.stream()
 				.filter(r -> r.relation.type == RelationType.UPREGULATES_EXPRESSION ||
 				r.relation.type == RelationType.DOWNREGULATES_EXPRESSION).collect(Collectors.toSet());
+				break;
 			case PHOSPHO_PRIMARY_EXPRESSION_SECONDARY:
 			{
 				Set<String> genes = getGenesInPhoshoGraph(results);
-				return results.stream().filter(r -> r.relation.type == RelationType.PHOSPHORYLATES ||
+				results = results.stream().filter(r -> r.relation.type == RelationType.PHOSPHORYLATES ||
 					r.relation.type == RelationType.DEPHOSPHORYLATES ||
 					genes.contains(r.source.id) ||
 					genes.contains(r.target.id))
 					.collect(Collectors.toSet());
+				break;
 			}
-
 			default: throw new RuntimeException("Unhandled relation filter type: " + relationFilterType);
 		}
+
+		if (focusGenes != null && !focusGenes.isEmpty())
+		{
+			results = results.stream().filter(r ->
+				focusGenes.contains(r.relation.source) ||
+				focusGenes.contains(r.relation.target)).collect(Collectors.toSet());
+		}
+
+		return results;
+	}
+
+	public void setRelationFilterType(RelationFilterType relationFilterType)
+	{
+		this.relationFilterType = relationFilterType;
+	}
+
+	public void setFocusGenes(Set<String> focusGenes)
+	{
+		this.focusGenes = focusGenes;
 	}
 
 	/**

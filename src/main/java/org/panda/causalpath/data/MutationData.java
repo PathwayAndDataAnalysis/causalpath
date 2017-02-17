@@ -59,4 +59,12 @@ public class MutationData extends CategoricalData
 	{
 		return true;
 	}
+
+	@Override
+	public ExperimentData copy()
+	{
+		MutationData copy = new MutationData(id, getGeneSymbols().iterator().next(), getEffect());
+		copy.data = data;
+		return copy;
+	}
 }

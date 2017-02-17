@@ -9,4 +9,12 @@ public class CNAData extends CategoricalData
 	{
 		super(id, symbol);
 	}
+
+	@Override
+	public ExperimentData copy()
+	{
+		CNAData copy = new CNAData(id, getGeneSymbols().iterator().next());
+		copy.data = data;
+		return copy;
+	}
 }

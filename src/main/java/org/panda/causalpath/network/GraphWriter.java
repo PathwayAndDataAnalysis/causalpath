@@ -1,6 +1,7 @@
 package org.panda.causalpath.network;
 
 import com.github.jsonldjava.utils.JsonUtils;
+import org.panda.causalpath.analyzer.NSCForNonCorr;
 import org.panda.causalpath.analyzer.NetworkSignificanceCalculator;
 import org.panda.causalpath.data.*;
 import org.panda.utility.CollectionUtil;
@@ -51,6 +52,22 @@ public class GraphWriter
 	private boolean useGeneBGForTotalProtein;
 
 	/**
+	 * The most intense color to show downregulation.
+	 */
+	private Color maxDownColor;
+
+	/**
+	 * The most intense color to show upregulation.
+	 */
+	private Color maxUpColor;
+
+	/**
+	 * The value where the most intense colors are reached. If a value is more extreme than this value, it will be
+	 * shown with the most intense color, and would be considered "saturated".
+	 */
+	private double colorSaturationValue;
+
+	/**
 	 * An object that can produce a color for a given up/downregulation value.
 	 */
 	private ValToColor vtc;
@@ -79,15 +96,55 @@ public class GraphWriter
 		this.relations = relations;
 		activatingBorderColor = new Color(0, 180, 20);
 		inhibitingBorderColor = new Color(180, 0, 20);
-		doubleSignificanceBorderColor = new Color(80, 80, 20);
+		doubleSignificanceBorderColor = new Color(150, 150, 0);
 		defaultBorderColor = new Color(50, 50, 50);
 
-		vtc = new ValToColor(new double[]{-1, 0, 1},
-			new Color[]{new Color(40, 80, 255), Color.WHITE, new Color(255, 80, 40)});
+		maxDownColor = new Color(40, 80, 255);
+		maxUpColor = new Color(255, 80, 40);
+		colorSaturationValue = 1;
+
+		initColorMapper();
 
 		useGeneBGForTotalProtein = false;
 
 		this.nsc = nsc;
+	}
+
+	/**
+	 * Saturation color for downregulation.
+	 */
+	public void setMaxDownColor(Color maxDownColor)
+	{
+		this.maxDownColor = maxDownColor;
+		initColorMapper();
+	}
+
+	/**
+	 * Saturation color for upregulation.
+	 */
+	public void setMaxUpColor(Color maxUpColor)
+	{
+		this.maxUpColor = maxUpColor;
+		initColorMapper();
+	}
+
+	/**
+	 * The value where color saturation occurs. The parameter has to be a positive value. Negative saturation will be
+	 * symmetrical to positive saturation.
+	 */
+	public void setColorSaturationValue(double colorSaturationValue)
+	{
+		this.colorSaturationValue = Math.abs(colorSaturationValue);
+		initColorMapper();
+	}
+
+	/**
+	 * Initializes the color mapping object.
+	 */
+	private void initColorMapper()
+	{
+		vtc = new ValToColor(new double[]{-colorSaturationValue, 0, colorSaturationValue},
+			new Color[]{maxDownColor, Color.WHITE, maxUpColor});
 	}
 
 	public void setUseGeneBGForTotalProtein(boolean useGeneBGForTotalProtein)
@@ -129,6 +186,7 @@ public class GraphWriter
 		filename = filename.substring(0, filename.lastIndexOf(".")) + ".format";
 		BufferedWriter writer2 = new BufferedWriter(new FileWriter(filename));
 		writer2.write("node\tall-nodes\tcolor\t255 255 255\n");
+		writer2.write("node\tall-nodes\tbordercolor\t" + inString(defaultBorderColor) + "\n");
 
 		Set<ExperimentData> dataInGraph = getExperimentDataToDraw();
 
@@ -191,13 +249,19 @@ public class GraphWriter
 						{
 							FileUtil.writeln("node\t" + gene + "\tborderwidth\t2", writer2);
 						}
-						boolean act = nsc.isActivatingTargetsSignificant(gene);
-						boolean inh = nsc.isInhibitoryTargetsSignificant(gene);
+						boolean act = false;
+						boolean inh = false;
+
+						if (nsc instanceof NSCForNonCorr)
+						{
+							act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(gene);
+							inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(gene);
+						}
 
 						if (act && !inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(activatingBorderColor), writer2);
 						else if (!act && inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(inhibitingBorderColor), writer2);
 						else if (act /** && inh **/) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(doubleSignificanceBorderColor), writer2);
-						else FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(defaultBorderColor), writer2);
+						//else FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(defaultBorderColor), writer2);
 					}
 					totalProtUsedUp.add(gene);
 				}

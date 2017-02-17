@@ -15,6 +15,8 @@ import org.panda.causalpath.resource.TCGALoader;
 import org.panda.resource.PhosphoSitePlus;
 import org.panda.resource.ResourceDirectory;
 import org.panda.resource.tcga.ProteomicsFileRow;
+import org.panda.utility.FileUtil;
+import org.panda.utility.statistics.Histogram;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -22,6 +24,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * This method is built to handle running the causality analysis using its jar file and pointing it to a related
@@ -39,6 +43,7 @@ public class Main
 	public static final String CONFLICTING_RESULT_FILE_PREFIX = "conflicting";
 	public static final String UNKNOWN_SITE_EFFECT_FILENAME = "unknown-site-effects.txt";
 	public static final String SIGNIFICANCE_FILENAME = "significance-pvals.txt";
+	public static final String VALUE_CHANGES_FILENAME = "value-changes.txt";
 
 	public static final String PROTEOMICS_PLATFORM_FILE_KEY = "proteomics-platform-file";
 	public static final String PROTEOMICS_VALUES_FILE_KEY = "proteomics-values-file";
@@ -50,7 +55,8 @@ public class Main
 	public static final String CONTROL_VALUE_COLUMN_KEY = "control-value-column";
 	public static final String TEST_VALUE_COLUMN_KEY = "test-value-column";
 	public static final String DO_LOG_TRANSFORM_KEY = "do-log-transform";
-	public static final String THRESHOLD_FOR_SIGNIFICANCE_KEY = "threshold-for-significance";
+	public static final String THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY = "threshold-for-data-significance";
+	public static final String THRESHOLD_FOR_NETWORK_SIGNIFICANCE_KEY = "threshold-for-network-significance";
 	public static final String THRESHOLD_FOR_CORRELATION_KEY = "threshold-for-correlation";
 	public static final String THRESHOLD_FOR_FDR_KEY = "threshold-for-FDR";
 	public static final String VALUE_TRANSFORMATION_KEY = "value-transformation";
@@ -63,6 +69,9 @@ public class Main
 	public static final String PERMUTATIONS_FOR_SIGNIFICANCE_KEY = "permutations-for-significance";
 	public static final String TCGA_DIRECTORY_KEY = "tcga-directory";
 	public static final String MUTATION_EFFECT_FILE_KEY = "mutation-effect-file";
+	public static final String COLOR_SATURATION_VALUE_KEY = "color-saturation-value";
+	public static final String DO_SITE_MATCHING_KEY = "do-site-matching";
+	public static final String GENE_FOCUS_KEY = "gene-focus";
 
 	/**
 	 * The directory where the parameters.txt file resides in.
@@ -124,7 +133,12 @@ public class Main
 	 * A threshold to determine significant changes whenever it applies. This can be a value threshold, or a p-value
 	 * threshold depending on the value transformation type.
 	 */
-	private double thresholdForSignificance;
+	private double thresholdForDataSignificance;
+
+	/**
+	 * A threshold to determine if the network size or a downstream of a protein is significantly crowded.
+	 */
+	private double thresholdForNetworkSignificance;
 
 	/**
 	 * A correlation threshold when the value transformation is correlation. This is optional, but if not used, then
@@ -177,7 +191,18 @@ public class Main
 
 	private String tcgaDirectory;
 
+	/**
+	 * The filename that contains mutation effects.
+	 */
 	private String mutationEffectFilename;
+
+	/**
+	 * The change value where the most saturated color will be used on the network. This is supposed to be a positive
+	 * value and the negative saturation value will be symmetrical.
+	 */
+	private double colorSaturationValue = 1;
+
+	private boolean doSiteMatching = true;
 
 	public static void main(String[] args) throws IOException
 	{
@@ -223,7 +248,8 @@ public class Main
 			case TEST_VALUE_COLUMN_KEY: if (testValueColumn == null) testValueColumn = new HashSet<>();
 				testValueColumn.add(value); break;
 			case DO_LOG_TRANSFORM_KEY: doLogTransfrorm = Boolean.valueOf(value); break;
-			case THRESHOLD_FOR_SIGNIFICANCE_KEY: thresholdForSignificance = Double.valueOf(value); break;
+			case THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY: thresholdForDataSignificance = Double.valueOf(value); break;
+			case THRESHOLD_FOR_NETWORK_SIGNIFICANCE_KEY: thresholdForNetworkSignificance = Double.valueOf(value); break;
 			case THRESHOLD_FOR_CORRELATION_KEY: thresholdForCorrelation = Double.valueOf(value); break;
 			case THRESHOLD_FOR_FDR_KEY: thresholdForFDR = Double.valueOf(value); break;
 			case VALUE_TRANSFORMATION_KEY: transformation = ValueTransformation.fetch(value); break;
@@ -231,11 +257,20 @@ public class Main
 			case SITE_EFFECT_PROXIMITY_THRESHOLD_KEY: siteEffectProximityThreshold = Integer.valueOf(value); break;
 			case SITE_MATCH_PROXIMITY_THRESHOLD_KEY: siteMatchProximityThreshold = Integer.valueOf(value); break;
 			case DEFAULT_MISSING_VALUE_KEY: defaultMissingValue = Double.valueOf(value); break;
-			case RELATION_FILTER_TYPE_KEY: graphFilter = new GraphFilter(value); break;
+			case RELATION_FILTER_TYPE_KEY:
+				if (graphFilter == null) graphFilter = new GraphFilter(value);
+				else graphFilter.setRelationFilterType(GraphFilter.RelationFilterType.get(value));
+				break;
+			case GENE_FOCUS_KEY:
+				if (graphFilter == null) graphFilter = new GraphFilter(new HashSet<>(Arrays.asList(value.split(";"))));
+				else graphFilter.setFocusGenes(new HashSet<>(Arrays.asList(value.split(";"))));
+				break;
 			case CALCULATE_NETWORK_SIGNIFICANCE_KEY: calculateNetworkSignificance = Boolean.valueOf(value); break;
 			case PERMUTATIONS_FOR_SIGNIFICANCE_KEY: permutationCount = Integer.valueOf(value); break;
 			case TCGA_DIRECTORY_KEY: tcgaDirectory = value; break;
 			case MUTATION_EFFECT_FILE_KEY: mutationEffectFilename = value; break;
+			case COLOR_SATURATION_VALUE_KEY: colorSaturationValue = Double.valueOf(value); break;
+			case DO_SITE_MATCHING_KEY: doSiteMatching = Boolean.valueOf(value); break;
 			default: throw new RuntimeException("Unknown parameter: " + key);
 		}
 	}
@@ -245,6 +280,11 @@ public class Main
 	 */
 	public void run() throws IOException
 	{
+		System.out.println("directory = " + directory);
+
+		// If there is no platform file, use the values file instead.
+		if (proteomicsPlatformFile == null) proteomicsPlatformFile = proteomicsValuesFile;
+
 		// Read platform file
 		List<ProteomicsFileRow> rows = ProteomicsFileReader.readAnnotation(
 			directory + File.separator + proteomicsPlatformFile,
@@ -288,20 +328,20 @@ public class Main
 		if (transformation == ValueTransformation.ARITHMETIC_MEAN ||
 			transformation == ValueTransformation.GEOMETRIC_MEAN)
 		{
-			detector = new ThresholdDetector(thresholdForSignificance);
+			detector = new ThresholdDetector(thresholdForDataSignificance);
 			((ThresholdDetector) detector).setGeometricMean(transformation == ValueTransformation.GEOMETRIC_MEAN);
 		}
 		else if (transformation == ValueTransformation.DIFFERENCE_OF_MEANS)
 		{
-			detector = new DifferenceDetector(thresholdForSignificance, ctrl, test);
+			detector = new DifferenceDetector(thresholdForDataSignificance, ctrl, test);
 		}
 		else if (transformation == ValueTransformation.FOLD_CHANGE_OF_MEAN)
 		{
-			detector = new FoldChangeDetector(thresholdForSignificance, ctrl, test);
+			detector = new FoldChangeDetector(thresholdForDataSignificance, ctrl, test);
 		}
 		else if (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN)
 		{
-			detector = new SignificanceDetector(thresholdForSignificance, ctrl, test);
+			detector = new SignificanceDetector(thresholdForDataSignificance, ctrl, test);
 		}
 
 		// Associate change detectors
@@ -309,7 +349,7 @@ public class Main
 
 		// Prepare relation-target compatibility checker
 		RelationTargetCompatibilityChecker rtcc = new RelationTargetCompatibilityChecker();
-		rtcc.setForceSiteMatching(true);
+		rtcc.setForceSiteMatching(doSiteMatching);
 		rtcc.setSiteProximityThreshold(siteMatchProximityThreshold);
 
 		// Load signed relations
@@ -331,14 +371,22 @@ public class Main
 			tcga.associateChangeDetector(detector, data -> true);
 		}
 
+		//---DEBUG
+		PrepareBoxPlots.runWithRelations(relations, directory, "D3", "M3");
+		//---END OF DEBUG
+
 		if (transformation == ValueTransformation.CORRELATION)
 		{
-			CorrelationDetector corrDet = new CorrelationDetector(thresholdForCorrelation, thresholdForSignificance);
+			CorrelationDetector corrDet = new CorrelationDetector(thresholdForCorrelation, thresholdForDataSignificance);
 
 			for (Relation rel : relations)
 			{
 				rel.setChDet(corrDet);
 			}
+		}
+		else // print value change histograms
+		{
+			writeValueChanges(relations);
 		}
 
 		// Prepare causality searcher
@@ -353,17 +401,26 @@ public class Main
 		// Significance calculation
 		NetworkSignificanceCalculator nsc = null;
 
-		if (calculateNetworkSignificance && transformation != ValueTransformation.CORRELATION)
+		if (calculateNetworkSignificance)
 		{
-			nsc = new NetworkSignificanceCalculator(relations, true, siteMatchProximityThreshold, true, graphFilter);
+			if (transformation == ValueTransformation.CORRELATION)
+			{
+				nsc = new NSCForCorrelation(relations, true, siteMatchProximityThreshold, true, graphFilter);
+			}
+			else
+			{
+				nsc = new NSCForNonCorr(relations, true, siteMatchProximityThreshold, true, graphFilter);
+			}
+
 			nsc.run(permutationCount);
-			nsc.setSignificanceThreshold(thresholdForSignificance);
+			nsc.setSignificanceThreshold(thresholdForNetworkSignificance);
 			nsc.writeResults(directory + File.separator + SIGNIFICANCE_FILENAME);
 			System.out.println("Graph size pval = " + nsc.getOverallGraphSizePval());
 		}
 
 		GraphWriter writer = new GraphWriter(relDat, nsc);
 		writer.setUseGeneBGForTotalProtein(true);
+		writer.setColorSaturationValue(colorSaturationValue);
 
 		// Generate output
 		writer.writeSIFGeneCentric(directory + File.separator + CAUSATIVE_RESULT_FILE_PREFIX);
@@ -381,6 +438,7 @@ public class Main
 		System.out.println("Conflicting relations = " + conflictSize);
 		writer = new GraphWriter(relDat, null);
 		writer.setUseGeneBGForTotalProtein(true);
+		writer.setColorSaturationValue(colorSaturationValue);
 		writer.writeSIFGeneCentric(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
 		writer.writeJSON(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
 
@@ -411,6 +469,35 @@ public class Main
 		writer.close();
 	}
 
+	private void writeValueChanges(Set<Relation> relations) throws IOException
+	{
+		// collect the experiment data from relations
+		Set<ExperimentData> datas = Stream.concat(relations.stream().map(r -> r.sourceData),
+			relations.stream().map(r -> r.targetData)).flatMap(Collection::stream)
+			.filter(ExperimentData::hasChangeDetector).collect(Collectors.toSet());
+
+		// find the data classes
+		Set<Class<? extends ExperimentData>> classes = datas.stream().map(d -> d.getClass()).collect(Collectors.toSet());
+
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get(directory + File.separator + VALUE_CHANGES_FILENAME));
+
+		for (Class<? extends ExperimentData> clazz : classes)
+		{
+			writer.write("\n\nData type: " + clazz.getName());
+
+			datas.stream().filter(d -> d.getClass().equals(clazz)).forEach(d ->
+				FileUtil.lnwrite(d.id + "\t" + d.getChangeValue(), writer));
+
+			Histogram h = new Histogram(0.5);
+			h.setBorderAtZero(true);
+			datas.stream().filter(d -> d.getClass().equals(clazz)).forEach(d -> h.count(d.getChangeValue()));
+			System.out.println("\nData type: " + clazz);
+			h.print();
+		}
+
+		writer.close();
+	}
+
 	/**
 	 * Enumeration of options for how to use the value columns to determine significance of a change.
 	 */
@@ -419,29 +506,29 @@ public class Main
 		ARITHMETIC_MEAN("arithmetic-mean", "The arithmetic mean value of the given values is used for significance " +
 			"detection of a single change. There should only be one group of values (marked with " + VALUE_COLUMN_KEY  +
 			"), the values have to be distributed around zero, and a threshold value should be provided for " +
-			"significance detection, using the " + THRESHOLD_FOR_SIGNIFICANCE_KEY + ".", false),
+			"significance detection, using the " + THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY + ".", false),
 
 		GEOMETRIC_MEAN("geometric-mean", "The geometric mean value of the given values is used for significance " +
 			"detection of a single change. This is the only case when the geometric mean is used for averaging a " +
 			"group of samples, and it is appropriate if the individual values are formed of some kind of ratios. " +
 			"There should only be one group of values (marked with " + VALUE_COLUMN_KEY  + "), the values have to be " +
 			"distributed around zero, and a threshold value should be provided for significance detection, using the " +
-			THRESHOLD_FOR_SIGNIFICANCE_KEY + ".", false),
+			THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY + ".", false),
 
 		DIFFERENCE_OF_MEANS("difference-of-means", "There should be control and test values, whose difference would " +
-			"be used for significance detection. The threshold for significance (" + THRESHOLD_FOR_SIGNIFICANCE_KEY +
+			"be used for significance detection. The threshold for significance (" + THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY +
 			") should also be provided.", true),
 
 		FOLD_CHANGE_OF_MEAN("fold-change-of-mean", "There should be control and test values, whose ratio will be " +
 			"converted to fold change and thresholded. The fold change value will be in the range (-inf, -1] + [1, " +
 			"inf). If the data file already contains a fold-change value, then please use the " + GEOMETRIC_MEAN.name +
-			" as value transformation. The threshold for significance (" + THRESHOLD_FOR_SIGNIFICANCE_KEY +
+			" as value transformation. The threshold for significance (" + THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY +
 			") should also be provided.", true),
 
 		SIGNIFICANT_CHANGE_OF_MEAN("significant-change-of-mean", "There should be sufficient amount of control and " +
 			"test values to detect the significance of change with a t-test. Technically there should be more than 3" +
 			" controls and 3 tests, practically, they should be much more to provide statistical power. The " +
-			THRESHOLD_FOR_SIGNIFICANCE_KEY + " should be used for a p-value threshold, or alternatively, " + THRESHOLD_FOR_FDR_KEY +
+			THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY + " should be used for a p-value threshold, or alternatively, " + THRESHOLD_FOR_FDR_KEY +
 			" should be used for controlling significance at the false discovery rate level.", true),
 
 		CORRELATION("correlation", "There should be one group of values (marked with " + VALUE_COLUMN_KEY + "). There " +
