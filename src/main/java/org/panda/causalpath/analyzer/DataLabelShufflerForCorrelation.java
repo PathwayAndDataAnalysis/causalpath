@@ -2,6 +2,7 @@ package org.panda.causalpath.analyzer;
 
 import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.Relation;
+import org.panda.utility.Progress;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,7 +38,7 @@ public class DataLabelShufflerForCorrelation
 			this.relations.add(copy);
 		}
 
-		ChDet det = new ChDet();
+		ChDet det = new ChDet(relations.iterator().next().chDet);
 		this.relations.forEach(r -> r.setChDet(det));
 
 		numDatas = Stream.concat(this.relations.stream().map(r -> r.sourceData).flatMap(Collection::stream),
@@ -94,31 +95,35 @@ public class DataLabelShufflerForCorrelation
 	private void initCorrelationMap(Set<Relation> relations)
 	{
 		correlationMap = new HashMap<>();
-
-		// Get experiment data in the relations
-		Set<ExperimentData> datas = Stream.concat(relations.stream().map(r -> r.sourceData),
-			relations.stream().map(r -> r.targetData)).flatMap(Collection::stream).collect(Collectors.toSet());
-
-		TwoDataChangeDetector det = relations.iterator().next().chDet;
-
-		for (ExperimentData d1 : datas)
-		{
-			Object o1 = getInnerData(d1);
-
-			for (ExperimentData d2 : datas)
-			{
-				if (d1.id.compareTo(d2.id) >= 0) continue;
-
-				Object o2 = getInnerData(d2);
-
-				int corr = det.getChangeSign(d1, d2);
-
-				if (!correlationMap.containsKey(o1)) correlationMap.put(o1, new HashMap<>());
-				if (!correlationMap.containsKey(o2)) correlationMap.put(o2, new HashMap<>());
-				correlationMap.get(o1).put(o2, corr);
-				correlationMap.get(o2).put(o1, corr);
-			}
-		}
+//
+//		// Get experiment data in the relations
+//		Set<ExperimentData> datas = Stream.concat(relations.stream().map(r -> r.sourceData),
+//			relations.stream().map(r -> r.targetData)).flatMap(Collection::stream).collect(Collectors.toSet());
+//
+//		TwoDataChangeDetector det = relations.iterator().next().chDet;
+//
+//		Progress p = new Progress((datas.size() * (datas.size() - 1)) / 2, "Calculating all pairs correlations");
+//
+//		for (ExperimentData d1 : datas)
+//		{
+//			Object o1 = getInnerData(d1);
+//
+//			for (ExperimentData d2 : datas)
+//			{
+//				if (d1.id.compareTo(d2.id) >= 0) continue;
+//
+//				Object o2 = getInnerData(d2);
+//
+//				int corr = det.getChangeSign(d1, d2);
+//
+//				if (!correlationMap.containsKey(o1)) correlationMap.put(o1, new HashMap<>());
+//				if (!correlationMap.containsKey(o2)) correlationMap.put(o2, new HashMap<>());
+//				correlationMap.get(o1).put(o2, corr);
+//				correlationMap.get(o2).put(o1, corr);
+//
+//				p.tick();
+//			}
+//		}
 	}
 
 	private Object getInnerData(ExperimentData data)
@@ -130,10 +135,30 @@ public class DataLabelShufflerForCorrelation
 
 	class ChDet implements TwoDataChangeDetector
 	{
+		TwoDataChangeDetector originalDet;
+
+		public ChDet(TwoDataChangeDetector originalDet)
+		{
+			this.originalDet = originalDet;
+		}
+
 		@Override
 		public int getChangeSign(ExperimentData source, ExperimentData target)
 		{
-			return correlationMap.get(getInnerData(source)).get(getInnerData(target));
+			Object os = getInnerData(source);
+			Object ot = getInnerData(target);
+
+			if (!correlationMap.containsKey(os)) correlationMap.put(os, new HashMap<>());
+			if (!correlationMap.containsKey(ot)) correlationMap.put(ot, new HashMap<>());
+
+			if (!correlationMap.get(os).containsKey(ot))
+			{
+				int corr = originalDet.getChangeSign(source, target);
+				correlationMap.get(os).put(ot, corr);
+				correlationMap.get(ot).put(os, corr);
+			}
+
+			return correlationMap.get(os).get(ot);
 		}
 	}
 }

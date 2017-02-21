@@ -326,10 +326,13 @@ public class Main
 		OneDataChangeDetector detector = null;
 
 		if (transformation == ValueTransformation.ARITHMETIC_MEAN ||
-			transformation == ValueTransformation.GEOMETRIC_MEAN)
+			transformation == ValueTransformation.GEOMETRIC_MEAN ||
+			transformation == ValueTransformation.MAX)
 		{
 			detector = new ThresholdDetector(thresholdForDataSignificance);
-			((ThresholdDetector) detector).setGeometricMean(transformation == ValueTransformation.GEOMETRIC_MEAN);
+			((ThresholdDetector) detector).setAveragingMethod(transformation == ValueTransformation.ARITHMETIC_MEAN ?
+				ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN : transformation == ValueTransformation.GEOMETRIC_MEAN ?
+				ThresholdDetector.AveragingMethod.FOLD_CHANGE_MEAN : ThresholdDetector.AveragingMethod.MAX);
 		}
 		else if (transformation == ValueTransformation.DIFFERENCE_OF_MEANS)
 		{
@@ -513,6 +516,11 @@ public class Main
 			"group of samples, and it is appropriate if the individual values are formed of some kind of ratios. " +
 			"There should only be one group of values (marked with " + VALUE_COLUMN_KEY  + "), the values have to be " +
 			"distributed around zero, and a threshold value should be provided for significance detection, using the " +
+			THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY + ".", false),
+
+		MAX("max", "The value with maximum absolute is used for the analysis. There should only be one group of " +
+			"values (marked with " + VALUE_COLUMN_KEY  + "), the values have to be distributed around zero, and a " +
+			"threshold value should be provided for significance detection, using the " +
 			THRESHOLD_FOR_DATA_SIGNIFICANCE_KEY + ".", false),
 
 		DIFFERENCE_OF_MEANS("difference-of-means", "There should be control and test values, whose difference would " +

@@ -50,7 +50,7 @@ public class DownstreamCounterForCorrelation extends DownstreamCounter
 			for (ExperimentData targetData : r.targetData)
 			{
 				if (rtcc.isCompatible(sourceData, r, targetData) &&
-					r.chDet.getChangeSign(sourceData, targetData) * r.getSign() == 1)
+					r.chDet.getChangeSign(sourceData, targetData) * r.getSign() == (causal ? 1 : -1))
 				{
 					return true;
 				}

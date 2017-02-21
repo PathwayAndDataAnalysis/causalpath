@@ -16,20 +16,18 @@ public class ThresholdDetector implements OneDataChangeDetector
 	protected double threshold;
 
 	/**
-	 * Whether to use the geometric mean for averaging the values. THis is false by default and only makes sense if the
-	 * values are some kind of ratios.
+	 * Method to reduce multiple values into one value.
 	 */
-	protected boolean geometricMean;
+	AveragingMethod avgMet;
 
 	public ThresholdDetector(double threshold)
 	{
 		this.threshold = threshold;
-		this.geometricMean = false;
 	}
 
-	public void setGeometricMean(boolean geometricMean)
+	public void setAveragingMethod(AveragingMethod method)
 	{
-		this.geometricMean = geometricMean;
+		this.avgMet = method;
 	}
 
 	@Override
@@ -45,12 +43,23 @@ public class ThresholdDetector implements OneDataChangeDetector
 		if (data instanceof NumericData)
 		{
 			NumericData nd = (NumericData) data;
-			return geometricMean ? foldChangeGeometricMean(nd.vals) : ArrayUtil.mean(nd.vals);
+			switch (avgMet)
+			{
+				case ARITHMETIC_MEAN: return ArrayUtil.mean(nd.vals);
+				case FOLD_CHANGE_MEAN: return foldChangeGeometricMean(nd.vals);
+				case MAX: return maxOfAbs(nd.vals);
+			}
 		}
 		else if (data instanceof CategoricalData)
 		{
 			CategoricalData qd = (CategoricalData) data;
-			return ArrayUtil.mean(qd.getCategories());
+
+			switch (avgMet)
+			{
+				case ARITHMETIC_MEAN: return ArrayUtil.mean(qd.getCategories());
+				case FOLD_CHANGE_MEAN: throw new RuntimeException("Fold change averaging cannot be applied to categories.");
+				case MAX: return maxOfAbs(qd.getCategories());
+			}
 		}
 		return 0;
 	}
@@ -69,5 +78,48 @@ public class ThresholdDetector implements OneDataChangeDetector
 			mult *= val < 0 ? -1 / val : val;
 		}
 		return Math.pow(mult, 1D / cnt);
+	}
+
+	public double maxOfAbs(double[] vals)
+	{
+		double max = 0;
+		double v = 0;
+
+		for (double val : vals)
+		{
+			double abs = Math.abs(val);
+			if (abs > max)
+			{
+				max = abs;
+				v = val;
+			}
+		}
+
+		return v;
+	}
+
+	public double maxOfAbs(int[] vals)
+	{
+		int max = 0;
+		int v = 0;
+
+		for (int val : vals)
+		{
+			int abs = Math.abs(val);
+			if (abs > max)
+			{
+				max = abs;
+				v = val;
+			}
+		}
+
+		return v;
+	}
+
+	public enum AveragingMethod
+	{
+		ARITHMETIC_MEAN,
+		FOLD_CHANGE_MEAN,
+		MAX
 	}
 }
