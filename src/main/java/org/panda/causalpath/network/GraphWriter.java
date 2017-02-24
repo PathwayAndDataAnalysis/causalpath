@@ -178,7 +178,7 @@ public class GraphWriter
 
 		// write relations
 		BufferedWriter writer1 = new BufferedWriter(new FileWriter(filename));
-		relations.forEach(r -> FileUtil.writeln(r.relation.toString(), writer1));
+		relations.stream().map(r -> r.relation).distinct().forEach(r -> FileUtil.writeln(r.toString(), writer1));
 		writer1.close();
 
 		Set<String> totalProtUsedUp = new HashSet<>();
@@ -422,6 +422,26 @@ public class GraphWriter
 					((Map) node.get("css")).put("backgroundColor", colS);
 					((Map) node.get("data")).put("tooltipText", tooltip);
 					totalProtUsedUp.add(sym);
+
+					if (nsc != null)
+					{
+						if (nsc.isDownstreamSignificant(sym))
+						{
+							((Map) node.get("css")).put("borderWidth", "2px");
+						}
+						boolean act = false;
+						boolean inh = false;
+
+						if (nsc instanceof NSCForNonCorr)
+						{
+							act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(sym);
+							inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(sym);
+						}
+
+						if (act && !inh) ((Map) node.get("css")).put("borderColor", inJSONString(activatingBorderColor));
+						else if (!act && inh) ((Map) node.get("css")).put("borderColor", inJSONString(inhibitingBorderColor));
+						else if (act /** && inh **/) ((Map) node.get("css")).put("borderColor", inJSONString(doubleSignificanceBorderColor));
+					}
 				}
 				else
 				{
