@@ -375,7 +375,7 @@ public class Main
 		}
 
 		//---DEBUG
-		PrepareBoxPlots.runWithRelations(relations, directory, "D3", "M3");
+//		PrepareBoxPlots.runWithRelations(relations, directory, "D3", "M3");
 		//---END OF DEBUG
 
 		if (transformation == ValueTransformation.CORRELATION)
