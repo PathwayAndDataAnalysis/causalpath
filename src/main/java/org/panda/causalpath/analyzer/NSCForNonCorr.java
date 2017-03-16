@@ -1,8 +1,11 @@
 package org.panda.causalpath.analyzer;
 
+import org.apache.poi.util.IntList;
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationAndSelectedData;
+import org.panda.resource.CancerGeneCensus;
+import org.panda.resource.OncoKB;
 import org.panda.utility.ArrayUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.Progress;
@@ -11,9 +14,8 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -53,14 +55,20 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 		DownstreamCounter dc = new DownstreamCounter(rtcc);
 		Map<String, Integer>[] current = dc.run(relations);
 
+		// Get the set of cancer genes in cancer gene databases.
+		Set<String> cancerGenes = new HashSet<>(OncoKB.get().getAllSymbols());
+		cancerGenes.addAll(CancerGeneCensus.get().getAllSymbols());
+
 		// Get a run with non-randomized data to find current size
 		CausalitySearcher cs = new CausalitySearcher(rtcc);
 		cs.setCausal(causal);
 		Set<RelationAndSelectedData> result = cs.run(relations);
 		if (graphFilter != null) result = graphFilter.filter(result);
-		int sizeCurrent = (int) result.stream().map(r -> r.relation).distinct().count();
+		long sizeCurrent = result.stream().map(r -> r.relation).distinct().count();
+		long currentCGCnt = getGenes(result).stream().filter(cancerGenes::contains).count();
 
-		int sizeCnt = 0;
+		long sizeCnt = 0;
+		long cgCnt = 0;
 
 		// Init counters for the randomizations
 		Map<String, Integer>[] cnt = new Map[3];
@@ -100,12 +108,16 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 			// Note if the network is as big
 			if (result.stream().map(r -> r.relation).distinct().count() >= sizeCurrent) sizeCnt++;
 
+			long cgCount = getGenes(result).stream().filter(cancerGenes::contains).count();
+			if (cgCount >= currentCGCnt) cgCnt++;
+
 			prog.tick();
 		}
 
 		// Convert counts to p-values
 
 		graphSizePval = sizeCnt / (double) iterations;
+		pvalForCGEnrichment = cgCnt / (double) iterations;
 
 		this.pvalMaps = new Map[3];
 		for (int i = 0; i < 3; i++)
@@ -118,6 +130,15 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 					cnt[i].get(gene) / (double) iterations);
 			}
 		}
+	}
+
+	/**
+	 * Gets the genes in a result set.
+	 */
+	private Set<String> getGenes(Set<RelationAndSelectedData> result)
+	{
+		return result.stream().map(r -> new String[]{r.relation.source, r.relation.target}).flatMap(Arrays::stream)
+			.collect(Collectors.toSet());
 	}
 
 

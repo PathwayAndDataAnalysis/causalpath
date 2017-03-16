@@ -25,6 +25,12 @@ public class ThresholdDetector implements OneDataChangeDetector
 		this.threshold = threshold;
 	}
 
+	public ThresholdDetector(double threshold, AveragingMethod avgMet)
+	{
+		this.threshold = threshold;
+		this.avgMet = avgMet;
+	}
+
 	public void setAveragingMethod(AveragingMethod method)
 	{
 		this.avgMet = method;

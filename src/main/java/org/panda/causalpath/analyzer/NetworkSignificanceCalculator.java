@@ -41,6 +41,11 @@ public abstract class NetworkSignificanceCalculator
 	protected double graphSizePval;
 
 	/**
+	 * A p-value for the enrichment of cancer genes in the result network.
+	 */
+	double pvalForCGEnrichment;
+
+	/**
 	 * Doing for either causal or conflicting graph.
 	 */
 	protected boolean causal;
@@ -77,6 +82,11 @@ public abstract class NetworkSignificanceCalculator
 	public void setSignificanceThreshold(double significanceThreshold)
 	{
 		this.significanceThreshold = significanceThreshold;
+	}
+
+	public double getPvalForCGEnrichment()
+	{
+		return pvalForCGEnrichment;
 	}
 
 	/**
