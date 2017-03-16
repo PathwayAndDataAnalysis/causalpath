@@ -419,6 +419,7 @@ public class Main
 			nsc.setSignificanceThreshold(thresholdForNetworkSignificance);
 			nsc.writeResults(directory + File.separator + SIGNIFICANCE_FILENAME);
 			System.out.println("Graph size pval = " + nsc.getOverallGraphSizePval());
+			System.out.println("Cancer gene enrichment pval = " + nsc.getPvalForCGEnrichment());
 		}
 
 		GraphWriter writer = new GraphWriter(relDat, nsc);
