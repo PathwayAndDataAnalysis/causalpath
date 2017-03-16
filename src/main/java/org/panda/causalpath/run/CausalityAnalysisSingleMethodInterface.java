@@ -41,7 +41,7 @@ public class CausalityAnalysisSingleMethodInterface
 	 * @param valueColumn Name of the values column in the measurements file
 	 * @param valueThreshold The value threshold to be considered as significant
 	 * @param graphType Either "compatible" or "conflicting"
-	 * @param siteMatchStrict option to enforce matching a phosphorylation site in the network with
+	 * @param doSiteMatch option to enforce matching a phosphorylation site in the network with
 	 *     the annotation of antibody
 	 * @param siteMatchProximityThreshold when site matching is on, this parameter sets the proxomity threshold for a
 	 *     site number in the relation to match the site whose change is observed in the data
@@ -56,7 +56,7 @@ public class CausalityAnalysisSingleMethodInterface
 	 */
 	public static void generateCausalityGraph(String platformFile, String idColumn,
 		String symbolsColumn, String sitesColumn, String effectColumn, String valuesFile,
-		String valueColumn, double valueThreshold, String graphType, boolean siteMatchStrict,
+		String valueColumn, double valueThreshold, String graphType, boolean doSiteMatch,
 		int siteMatchProximityThreshold, int siteEffectProximityThreshold, boolean geneCentric,
 		String outputFilePrefix, String customNetworkDirectory) throws IOException
 	{
@@ -73,7 +73,7 @@ public class CausalityAnalysisSingleMethodInterface
 		// Fill-in missing effect from PhosphoSitePlus
 		PhosphoSitePlus.get().fillInMissingEffect(rows, siteEffectProximityThreshold);
 
-		generateCausalityGraph(rows, valueThreshold, graphType, siteMatchStrict, siteMatchProximityThreshold,
+		generateCausalityGraph(rows, valueThreshold, graphType, doSiteMatch, siteMatchProximityThreshold,
 			geneCentric, outputFilePrefix);
 	}
 
@@ -83,14 +83,14 @@ public class CausalityAnalysisSingleMethodInterface
 	 * @param rows The proteomics data rows that are read from an external source
 	 * @param valueThreshold The value threshold to be considered as significant
 	 * @param graphType Either "compatible" or "conflicting"
-	 * @param siteMatchStrict option to enforce matching a phosphorylation site in the network with
+	 * @param doSiteMatch option to enforce matching a phosphorylation site in the network with
 	 *                       the annotation of antibody
 	 * @param geneCentric Option to produce a gene-centric or an antibody-centric graph
 	 * @param outputFilePrefix If the user provides xxx, then xxx.sif and xxx.format are generated
 	 * @throws IOException
 	 */
 	public static void generateCausalityGraph(Collection<ProteomicsFileRow> rows, double valueThreshold,
-		String graphType, boolean siteMatchStrict, int siteMatchProximityThreshold, boolean geneCentric,
+		String graphType, boolean doSiteMatch, int siteMatchProximityThreshold, boolean geneCentric,
 		String outputFilePrefix) throws IOException
 	{
 		ProteomicsLoader loader = new ProteomicsLoader(rows);
@@ -100,7 +100,7 @@ public class CausalityAnalysisSingleMethodInterface
 
 		// Prepare relation-target compatibility checker
 		RelationTargetCompatibilityChecker rtcc = new RelationTargetCompatibilityChecker();
-		rtcc.setForceSiteMatching(siteMatchStrict);
+		rtcc.setForceSiteMatching(doSiteMatch);
 		rtcc.setSiteProximityThreshold(siteMatchProximityThreshold);
 
 		// Load signed relations
