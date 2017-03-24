@@ -49,6 +49,7 @@ public class CausalityAnalysisSingleMethodInterface
 	 *    effect of proximate sites. This parameter sets the proximity threshold for using the proximate sites for that
 	 *    prediction.
 	 * @param geneCentric Option to produce a gene-centric or an antibody-centric graph
+	 * @param colorSaturationValue The value that maps to the most saturated color
 	 * @param outputFilePrefix If the user provides xxx, then xxx.sif and xxx.format are generated
 	 * @param customNetworkDirectory The directory that the network will be downloaded and SignedPC
 	 *                               directory will be created in. Pass null to use default
@@ -58,7 +59,7 @@ public class CausalityAnalysisSingleMethodInterface
 		String symbolsColumn, String sitesColumn, String effectColumn, String valuesFile,
 		String valueColumn, double valueThreshold, String graphType, boolean doSiteMatch,
 		int siteMatchProximityThreshold, int siteEffectProximityThreshold, boolean geneCentric,
-		String outputFilePrefix, String customNetworkDirectory) throws IOException
+		double colorSaturationValue, String outputFilePrefix, String customNetworkDirectory) throws IOException
 	{
 		if (customNetworkDirectory != null) ResourceDirectory.set(customNetworkDirectory);
 
@@ -74,7 +75,7 @@ public class CausalityAnalysisSingleMethodInterface
 		PhosphoSitePlus.get().fillInMissingEffect(rows, siteEffectProximityThreshold);
 
 		generateCausalityGraph(rows, valueThreshold, graphType, doSiteMatch, siteMatchProximityThreshold,
-			geneCentric, outputFilePrefix);
+			geneCentric, colorSaturationValue, outputFilePrefix);
 	}
 
 	/**
@@ -86,12 +87,13 @@ public class CausalityAnalysisSingleMethodInterface
 	 * @param doSiteMatch option to enforce matching a phosphorylation site in the network with
 	 *                       the annotation of antibody
 	 * @param geneCentric Option to produce a gene-centric or an antibody-centric graph
+	 * @param colorSaturationValue The value that maps to the most saturated color
 	 * @param outputFilePrefix If the user provides xxx, then xxx.sif and xxx.format are generated
 	 * @throws IOException
 	 */
 	public static void generateCausalityGraph(Collection<ProteomicsFileRow> rows, double valueThreshold,
 		String graphType, boolean doSiteMatch, int siteMatchProximityThreshold, boolean geneCentric,
-		String outputFilePrefix) throws IOException
+		double colorSaturationValue, String outputFilePrefix) throws IOException
 	{
 		ProteomicsLoader loader = new ProteomicsLoader(rows);
 		// Associate change detectors
@@ -116,6 +118,7 @@ public class CausalityAnalysisSingleMethodInterface
 
 		GraphWriter writer = new GraphWriter(relDat);
 		writer.setUseGeneBGForTotalProtein(true);
+		writer.setColorSaturationValue(colorSaturationValue);
 
 		// Generate output
 		if (geneCentric) writer.writeSIFGeneCentric(outputFilePrefix);
@@ -125,8 +128,8 @@ public class CausalityAnalysisSingleMethodInterface
 	// Test in class. Bad practice. Tsk tsk tsk
 	public static void main(String[] args) throws IOException
 	{
-		generateCausalityGraph("/home/babur/Documents/Temp/temp/abdata-chibe.txt", "ID1", "Symbols", "Sites",
-			"Effect", "/home/babur/Documents/Temp/temp/ovcar4_dif_drug_sig.txt", "change", 0.001,
-			"compatible", true, 0, 0, false, "/home/babur/Documents/Temp/temp/out", null);
+		generateCausalityGraph("/home/babur/Documents/Temp/temp/platform.txt", "ID1", "Symbols", "Sites",
+			"Effect", "/home/babur/Documents/Temp/temp/values.txt", "change", 0.001,
+			"conflicting", false, 0, 0, false, 10, "/home/babur/Documents/Temp/temp/out", null);
 	}
 }

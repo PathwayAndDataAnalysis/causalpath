@@ -72,6 +72,7 @@ public class Main
 	public static final String COLOR_SATURATION_VALUE_KEY = "color-saturation-value";
 	public static final String DO_SITE_MATCHING_KEY = "do-site-matching";
 	public static final String GENE_FOCUS_KEY = "gene-focus";
+	public static final String BUILT_IN_NETWORK_RESOURCE_SELECTION_KEY = "built-in-network-resource-selection";
 
 	/**
 	 * The directory where the parameters.txt file resides in.
@@ -204,6 +205,12 @@ public class Main
 
 	private boolean doSiteMatching = true;
 
+	/**
+	 * A string that can indicate the combinations of the built-in network resources to use in the analysis. The
+	 * possible resources are PC, REACH, PhosphoNetworks, and TRRUST. User is supposed to provide a string
+	 */
+	private String networkSelection;
+
 	public static void main(String[] args) throws IOException
 	{
 		if (args.length < 1)
@@ -271,6 +278,7 @@ public class Main
 			case MUTATION_EFFECT_FILE_KEY: mutationEffectFilename = value; break;
 			case COLOR_SATURATION_VALUE_KEY: colorSaturationValue = Double.valueOf(value); break;
 			case DO_SITE_MATCHING_KEY: doSiteMatching = Boolean.valueOf(value); break;
+			case BUILT_IN_NETWORK_RESOURCE_SELECTION_KEY: networkSelection = value; break;
 			default: throw new RuntimeException("Unknown parameter: " + key);
 		}
 	}
@@ -356,7 +364,9 @@ public class Main
 		rtcc.setSiteProximityThreshold(siteMatchProximityThreshold);
 
 		// Load signed relations
-		Set<Relation> relations = NetworkLoader.load();
+		Set<Relation> relations = networkSelection == null ? NetworkLoader.load() :
+			NetworkLoader.load(NetworkLoader.ResourceType.getSelectedResources(networkSelection));
+
 		loader.decorateRelations(relations, rtcc);
 
 		// Load other TCGA profiles if available

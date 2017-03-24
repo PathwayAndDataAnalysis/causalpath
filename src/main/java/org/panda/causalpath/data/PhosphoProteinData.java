@@ -29,11 +29,18 @@ public class PhosphoProteinData extends ProteinData
 
 		siteMap = new HashMap<>();
 
-		row.sites.keySet().stream().forEach(sym ->
-			siteMap.put(sym, row.sites.get(sym).stream().map(site ->
-				new PhosphoSite(Integer.parseInt(site.substring(1)), site.substring(0, 1),
-					row.effect == null ? 0 : row.effect == ProteomicsFileRow.SiteEffect.ACTIVATING ? 1 :
-					row.effect == ProteomicsFileRow.SiteEffect.INHIBITING ? -1 : 0)).collect(Collectors.toSet())));
+		try
+		{
+			row.sites.keySet().stream().forEach(sym ->
+				siteMap.put(sym, row.sites.get(sym).stream().map(site ->
+					new PhosphoSite(Integer.parseInt(site.substring(1)), site.substring(0, 1),
+						row.effect == null ? 0 : row.effect == ProteomicsFileRow.SiteEffect.ACTIVATING ? 1 :
+							row.effect == ProteomicsFileRow.SiteEffect.INHIBITING ? -1 : 0)).collect(Collectors.toSet())));
+		}
+		catch (NumberFormatException e)
+		{
+			e.printStackTrace();
+		}
 	}
 
 	/**

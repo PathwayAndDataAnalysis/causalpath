@@ -6,6 +6,7 @@ import org.panda.causalpath.network.RelationType;
 import org.panda.resource.PhosphoSitePlus;
 import org.panda.resource.network.PhosphoNetworks;
 import org.panda.resource.network.SignedPC;
+import org.panda.resource.network.SignedREACH;
 import org.panda.resource.network.TRRUST;
 import org.panda.resource.signednetwork.SignedType;
 import org.panda.utility.graph.Graph;
@@ -19,22 +20,46 @@ import java.util.*;
 public class NetworkLoader
 {
 	/**
-	 * Reads Pathway Commons from the SignedPC in the resource project.
+	 * Reads 3 of the built-in resource networks.
 	 */
 	public static Set<Relation> load()
 	{
+		return load(new HashSet<>(Arrays.asList(ResourceType.PC, ResourceType.PhosphoNetworks, ResourceType.TRRUST)));
+	}
+
+	/**
+	 * Reads the selected built-in resource networks.
+	 */
+	public static Set<Relation> load(Set<ResourceType> resourceTypes)
+	{
 		Set<Relation> relations = new HashSet<>();
 
+		Map<SignedType, Graph> allGraphs = new HashMap<>();
+
 		// Load signed directed graph from Pathway Commons
+		if (resourceTypes.contains(ResourceType.PC))
+		{
+			mergeSecondMapIntoFirst(allGraphs, SignedPC.get().getAllGraphs());
+		}
 
-		SignedPC spc = new SignedPC();
-		Map<SignedType, Graph> allGraphs = spc.getAllGraphs();
+		// Add REACH
+		if (resourceTypes.contains(ResourceType.REACH))
+		{
+			mergeSecondMapIntoFirst(allGraphs, SignedREACH.get().getAllGraphs());
+		}
 
-		// Add PhoshoNetworks and TRRUST
+		// Add PhosphoNetworks
+		if (resourceTypes.contains(ResourceType.PhosphoNetworks))
+		{
+			allGraphs.get(SignedType.PHOSPHORYLATES).merge(PhosphoNetworks.get().getGraph());
+		}
 
-		allGraphs.get(SignedType.PHOSPHORYLATES).merge(PhosphoNetworks.get().getGraph());
-		allGraphs.get(SignedType.UPREGULATES_EXPRESSION).merge(TRRUST.get().getPositiveGraph());
-		allGraphs.get(SignedType.DOWNREGULATES_EXPRESSION).merge(TRRUST.get().getNegativeGraph());
+		// Add TRRUST
+		if (resourceTypes.contains(ResourceType.TRRUST))
+		{
+			allGraphs.get(SignedType.UPREGULATES_EXPRESSION).merge(TRRUST.get().getPositiveGraph());
+			allGraphs.get(SignedType.DOWNREGULATES_EXPRESSION).merge(TRRUST.get().getNegativeGraph());
+		}
 
 		// Generate relations based on the network
 
@@ -82,5 +107,41 @@ public class NetworkLoader
 			}
 		}
 		return relations;
+	}
+
+	private static void mergeSecondMapIntoFirst(Map<SignedType, Graph> allGraphs, Map<SignedType, Graph> graphs)
+	{
+		for (SignedType type : graphs.keySet())
+		{
+			if (allGraphs.containsKey(type)) allGraphs.get(type).merge(graphs.get(type));
+			else allGraphs.put(type, graphs.get(type));
+		}
+	}
+
+	public enum ResourceType
+	{
+		PC,
+		REACH,
+		PhosphoNetworks,
+		TRRUST;
+
+		public static Set<ResourceType> getSelectedResources(String s)
+		{
+			Set<ResourceType> set = new HashSet<>();
+			for (String res : s.split(",|;|\\s+|\\|"))
+			{
+				res = res.trim();
+				try
+				{
+					ResourceType type = valueOf(res);
+					set.add(type);
+				}
+				catch (IllegalArgumentException e)
+				{
+					throw new RuntimeException("Network resource not recognized: " + res);
+				}
+			}
+			return set;
+		}
 	}
 }
