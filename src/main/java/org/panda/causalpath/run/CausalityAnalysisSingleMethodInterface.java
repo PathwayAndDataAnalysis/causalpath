@@ -130,6 +130,6 @@ public class CausalityAnalysisSingleMethodInterface
 	{
 		generateCausalityGraph("/home/babur/Documents/Temp/temp/platform.txt", "ID1", "Symbols", "Sites",
 			"Effect", "/home/babur/Documents/Temp/temp/values.txt", "change", 0.001,
-			"conflicting", false, 0, 0, false, 10, "/home/babur/Documents/Temp/temp/out", null);
+			"conflicting", false, 0, 0, false, 10.0, "/home/babur/Documents/Temp/temp/out", null);
 	}
 }

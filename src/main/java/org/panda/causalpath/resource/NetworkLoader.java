@@ -4,11 +4,9 @@ import org.panda.causalpath.data.PhosphoSite;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationType;
 import org.panda.resource.PhosphoSitePlus;
-import org.panda.resource.network.PhosphoNetworks;
-import org.panda.resource.network.SignedPC;
-import org.panda.resource.network.SignedREACH;
-import org.panda.resource.network.TRRUST;
+import org.panda.resource.network.*;
 import org.panda.resource.signednetwork.SignedType;
+import org.panda.utility.graph.DirectedGraph;
 import org.panda.utility.graph.Graph;
 import org.panda.utility.graph.PhosphoGraph;
 
@@ -34,12 +32,12 @@ public class NetworkLoader
 	{
 		Set<Relation> relations = new HashSet<>();
 
-		Map<SignedType, Graph> allGraphs = new HashMap<>();
+		Map<SignedType, DirectedGraph> allGraphs = new HashMap<>();
 
 		// Load signed directed graph from Pathway Commons
 		if (resourceTypes.contains(ResourceType.PC))
 		{
-			mergeSecondMapIntoFirst(allGraphs, SignedPC.get().getAllGraphs());
+			mergeSecondMapIntoFirst(allGraphs, SignedPCNoTransfac.get().getAllGraphs());
 		}
 
 		// Add REACH
@@ -65,7 +63,7 @@ public class NetworkLoader
 
 		for (SignedType signedType : allGraphs.keySet())
 		{
-			Graph graph = allGraphs.get(signedType);
+			DirectedGraph graph = allGraphs.get(signedType);
 
 			// take a subset of the network for debugging
 //			graph.crop(Arrays.asList("PIK3CA", "AKT1"));
@@ -109,7 +107,7 @@ public class NetworkLoader
 		return relations;
 	}
 
-	private static void mergeSecondMapIntoFirst(Map<SignedType, Graph> allGraphs, Map<SignedType, Graph> graphs)
+	private static void mergeSecondMapIntoFirst(Map<SignedType, DirectedGraph> allGraphs, Map<SignedType, DirectedGraph> graphs)
 	{
 		for (SignedType type : graphs.keySet())
 		{
