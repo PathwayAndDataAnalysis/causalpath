@@ -112,4 +112,12 @@ public abstract class ExperimentData
 	 * Generates a copy of the object.
 	 */
 	public abstract ExperimentData copy();
+
+	public abstract DataType getType();
+
+	@Override
+	public String toString()
+	{
+		return id;
+	}
 }

@@ -36,6 +36,11 @@ public class ThresholdDetector implements OneDataChangeDetector
 		this.avgMet = method;
 	}
 
+	public void setThreshold(double threshold)
+	{
+		this.threshold = threshold;
+	}
+
 	@Override
 	public int getChangeSign(ExperimentData data)
 	{
@@ -68,6 +73,12 @@ public class ThresholdDetector implements OneDataChangeDetector
 			}
 		}
 		return 0;
+	}
+
+	@Override
+	public OneDataChangeDetector makeACopy()
+	{
+		return new ThresholdDetector(this.threshold, this.avgMet);
 	}
 
 	/**

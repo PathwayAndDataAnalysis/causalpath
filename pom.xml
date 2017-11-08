@@ -41,7 +41,7 @@
 						</descriptorRefs>
 						<archive>
 							<manifest>
-								<mainClass>org.panda.causalpath.run.Main</mainClass>
+								<mainClass>org.panda.causalpath.run.CausalPath</mainClass>
 								<addClasspath>true</addClasspath>
 							</manifest>
 						</archive>

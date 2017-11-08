@@ -2,10 +2,8 @@ package org.panda.causalpath.run;
 
 import org.panda.causalpath.analyzer.CausalitySearcher;
 import org.panda.causalpath.analyzer.CorrelationDetector;
-import org.panda.causalpath.analyzer.RelationTargetCompatibilityChecker;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
-import org.panda.causalpath.network.RelationAndSelectedData;
 import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.causalpath.resource.TCGALoader;
 import org.panda.utility.Kronometre;
@@ -32,7 +30,7 @@ public class TCGARecurrentCorrelationRun
 
 		if (!(new File(single).exists())) new File(single).mkdirs();
 
-		Map<RelationAndSelectedData, Integer> relCnt = new HashMap<>();
+		Map<Relation, Integer> relCnt = new HashMap<>();
 
 		for (File dir : new File(tcgaDataDir).listFiles())
 		{
@@ -58,11 +56,10 @@ public class TCGARecurrentCorrelationRun
 						rel.chDet = det;
 					}
 				}
-				CausalitySearcher searcher = new CausalitySearcher(new RelationTargetCompatibilityChecker());
-//				searcher.setGenesWithTotalProteinData(loader.getGenesWithTotalProteinData());
-				Set<RelationAndSelectedData> causal = searcher.run(rels);
+				CausalitySearcher searcher = new CausalitySearcher(true);
+				Set<Relation> causal = searcher.run(rels);
 
-				for (RelationAndSelectedData r : causal)
+				for (Relation r : causal)
 				{
 					relCnt.put(r, relCnt.containsKey(r) ? relCnt.get(r) + 1 : 1);
 				}
@@ -75,12 +72,12 @@ public class TCGARecurrentCorrelationRun
 		}
 
 		if (!(new File(recurrent).exists())) new File(recurrent).mkdirs();
-		Map<Integer, Set<RelationAndSelectedData>> grouped = new HashMap<>();
+		Map<Integer, Set<Relation>> grouped = new HashMap<>();
 		Set<Integer> rec = new HashSet<>(relCnt.values());
 		for (Integer i : rec)
 		{
-			Set<RelationAndSelectedData> set = new HashSet<>();
-			for (RelationAndSelectedData r : relCnt.keySet())
+			Set<Relation> set = new HashSet<>();
+			for (Relation r : relCnt.keySet())
 			{
 				if (relCnt.get(r) >= i) set.add(r);
 			}

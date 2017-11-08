@@ -30,8 +30,8 @@ public class PrepareBoxPlots
 
 	public static void runWithRelations(Set<Relation> relations, String directory, String controlName, String testName) throws IOException
 	{
-		Set<ExperimentData> datas = Stream.concat(relations.stream().map(r -> r.sourceData),
-			relations.stream().map(r -> r.targetData)).flatMap(Collection::stream).collect(Collectors.toSet());
+		Set<ExperimentData> datas = relations.stream().map(Relation::getAllData).flatMap(Collection::stream)
+			.collect(Collectors.toSet());
 
 		run(datas, directory, controlName, testName);
 	}

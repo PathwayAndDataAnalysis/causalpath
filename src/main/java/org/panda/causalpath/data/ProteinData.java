@@ -31,4 +31,10 @@ public class ProteinData extends NumericData
 		copy.vals = vals;
 		return copy;
 	}
+
+	@Override
+	public DataType getType()
+	{
+		return DataType.PROTEIN;
+	}
 }

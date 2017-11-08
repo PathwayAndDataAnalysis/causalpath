@@ -2,13 +2,11 @@ package org.panda.causalpath.run;
 
 import org.panda.causalpath.analyzer.CausalityHelper;
 import org.panda.causalpath.analyzer.CausalitySearcher;
-import org.panda.causalpath.analyzer.RelationTargetCompatibilityChecker;
 import org.panda.causalpath.analyzer.SignificanceDetector;
 import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.MutationData;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
-import org.panda.causalpath.network.RelationAndSelectedData;
 import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.causalpath.resource.TCGALoader;
 import org.panda.resource.tcga.MutSigReader;
@@ -79,14 +77,14 @@ public class TCGAEffectOfMutationRun
 					{
 						if (!rel.sourceData.isEmpty() && !rel.targetData.isEmpty())
 						{
-							rel.sourceData.forEach(d -> d.setChDet(det));
-							rel.targetData.forEach(d -> d.setChDet(det));
+							rel.sourceData.setChangeDet(det);
+							rel.targetData.setChangeDet(det);
 							rel.chDet = ch;
 						}
 					}
 
-					CausalitySearcher searcher = new CausalitySearcher(new RelationTargetCompatibilityChecker());
-					Set<RelationAndSelectedData> causal = searcher.run(rels);
+					CausalitySearcher searcher = new CausalitySearcher(true);
+					Set<Relation> causal = searcher.run(rels);
 
 					System.out.println("causal.size() = " + causal.size());
 

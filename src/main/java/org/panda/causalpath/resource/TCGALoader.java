@@ -143,7 +143,7 @@ public class TCGALoader
 			double[] val = expReader.getGeneAlterationArray(symbol, samples);
 			if (val != null)
 			{
-				ExpressionData d = new ExpressionData(symbol + "-rna", symbol);
+				RNAData d = new RNAData(symbol + "-rna", symbol);
 				d.vals = val;
 				set.add(d);
 			}
@@ -164,11 +164,8 @@ public class TCGALoader
 	 */
 	public void decorateRelations(Set<Relation> relations)
 	{
-		for (Relation relation : relations)
-		{
-			relation.sourceData.addAll(getData(relation.source));
-			relation.targetData.addAll(getData(relation.target));
-		}
+		relations.stream().map(r -> new GeneWithData[]{r.sourceData, r.targetData}).flatMap(Arrays::stream).distinct()
+			.forEach(d -> d.addAll(getData(d.getId())));
 	}
 
 	/**

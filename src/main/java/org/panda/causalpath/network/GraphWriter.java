@@ -9,7 +9,6 @@ import org.panda.utility.FileUtil;
 import org.panda.utility.ValToColor;
 
 import java.awt.*;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -75,14 +74,18 @@ public class GraphWriter
 	/**
 	 * The set of relations with the associated data to draw.
 	 */
-	private Set<RelationAndSelectedData> relations;
+	private Set<Relation> relations;
 
 	private NetworkSignificanceCalculator nsc;
+
+	private Set<ExperimentData> experimentDataToDraw;
+
+	private Set<GeneWithData> otherGenesToShow;
 
 	/**
 	 * Constructor with the relations. Those relations are the result of the causality search.
 	 */
-	public GraphWriter(Set<RelationAndSelectedData> relations)
+	public GraphWriter(Set<Relation> relations)
 	{
 		this(relations, null);
 	}
@@ -91,7 +94,7 @@ public class GraphWriter
 	 * Constructor with the relations and significance calculation results.
 	 * Those relations are the result of the causality search.
 	 */
-	public GraphWriter(Set<RelationAndSelectedData> relations, NetworkSignificanceCalculator nsc)
+	public GraphWriter(Set<Relation> relations, NetworkSignificanceCalculator nsc)
 	{
 		this.relations = relations;
 		activatingBorderColor = new Color(0, 180, 20);
@@ -167,6 +170,16 @@ public class GraphWriter
 		this.vtc = vtc;
 	}
 
+	public void setExperimentDataToDraw(Set<ExperimentData> experimentDataToDraw)
+	{
+		this.experimentDataToDraw = experimentDataToDraw;
+	}
+
+	public void setOtherGenesToShow(Set<GeneWithData> set)
+	{
+		this.otherGenesToShow = set;
+	}
+
 	/**
 	 * Produces a causality graph where each node corresponds to a gene. In this graph, data may be displayed more than
 	 * once if they map to more than one gene. The output .sif and .format files can be visualized using ChiBE. From
@@ -178,7 +191,13 @@ public class GraphWriter
 
 		// write relations
 		BufferedWriter writer1 = new BufferedWriter(new FileWriter(filename));
-		relations.stream().map(r -> r.relation).distinct().forEach(r -> FileUtil.writeln(r.toString(), writer1));
+		relations.stream().distinct().forEach(r -> FileUtil.writeln(r.toString(), writer1));
+		if (otherGenesToShow != null)
+		{
+			Set<String> genesInGraph = getGenesInGraph();
+			otherGenesToShow.stream().filter(g -> !genesInGraph.contains(g.getId())).forEach(g ->
+				FileUtil.writeln(g.getId(), writer1));
+		}
 		writer1.close();
 
 		Set<String> totalProtUsedUp = new HashSet<>();
@@ -224,7 +243,7 @@ public class GraphWriter
 			{
 				let = "c";
 			}
-			else if (data instanceof ExpressionData)
+			else if (data instanceof RNAData)
 			{
 				let = "e";
 			}
@@ -234,44 +253,50 @@ public class GraphWriter
 				bor = inString(activatingBorderColor);
 			}
 
-			String tooltip = data.id;
-			if (data.hasChangeDetector()) tooltip += ", " + data.getChangeValue();
+			String siteID = data.id;
+			String val = data.hasChangeDetector() ? data.getChangeValue() + "" : "";
 
 			for (String gene : data.getGeneSymbols())
 			{
+				if (nsc != null)
+				{
+					if (nsc.isDownstreamSignificant(gene))
+					{
+						FileUtil.writeln("node\t" + gene + "\tborderwidth\t2", writer2);
+					}
+					boolean act = false;
+					boolean inh = false;
+
+					if (nsc instanceof NSCForNonCorr)
+					{
+						act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(gene);
+						inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(gene);
+					}
+
+					if (act && !inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(activatingBorderColor), writer2);
+					else if (!act && inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(inhibitingBorderColor), writer2);
+					else if (act /** && inh **/) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(doubleSignificanceBorderColor), writer2);
+					//else FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(defaultBorderColor), writer2);
+				}
+
 				if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(gene))
 				{
 					FileUtil.writeln("node\t" + gene + "\tcolor\t" + colS, writer2);
-					FileUtil.writeln("node\t" + gene + "\ttooltip\t" + tooltip, writer2);
-					if (nsc != null)
-					{
-						if (nsc.isDownstreamSignificant(gene))
-						{
-							FileUtil.writeln("node\t" + gene + "\tborderwidth\t2", writer2);
-						}
-						boolean act = false;
-						boolean inh = false;
-
-						if (nsc instanceof NSCForNonCorr)
-						{
-							act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(gene);
-							inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(gene);
-						}
-
-						if (act && !inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(activatingBorderColor), writer2);
-						else if (!act && inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(inhibitingBorderColor), writer2);
-						else if (act /** && inh **/) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(doubleSignificanceBorderColor), writer2);
-						//else FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(defaultBorderColor), writer2);
-					}
+					FileUtil.writeln("node\t" + gene + "\ttooltip\t" + siteID, writer2);
 					totalProtUsedUp.add(gene);
 				}
 				else
 				{
-					FileUtil.writeln("node\t" + gene + "\trppasite\t" + tooltip + "|" + let + "|" + colS + "|" + bor,
-						writer2);
+					FileUtil.writeln("node\t" + gene + "\trppasite\t" + siteID + "|" + let + "|" + colS + "|" + bor +
+						"|" + val, writer2);
 				}
 			}
 		});
+
+		if (otherGenesToShow != null)
+		{
+
+		}
 
 		writer2.close();
 	}
@@ -302,14 +327,15 @@ public class GraphWriter
 
 		// write relations
 		BufferedWriter writer1 = new BufferedWriter(new FileWriter(filename));
-		relations.forEach(r -> FileUtil.writeln(r.source.id + "\t" + r.relation.type.name + "\t" + r.target.id, writer1));
+		relations.forEach(r -> FileUtil.writeln(r.source + "\t" + r.type.name + "\t" + r.target + "\t" +
+			r.getMediators(), writer1));
 		writer1.close();
 
 		filename = filename.substring(0, filename.lastIndexOf(".")) + ".format";
 		BufferedWriter writer2 = new BufferedWriter(new FileWriter(filename));
 		writer2.write("node\tall-nodes\tcolor\t255 255 255\n");
-		relations.stream().map(r -> new ExperimentData[]{r.source, r.target}).flatMap(Arrays::stream).distinct()
-			.filter(data -> data.hasChangeDetector() && data.getChangeSign() != 0).forEach(data ->
+		relations.stream().map(r -> new GeneWithData[]{r.sourceData, r.targetData}).flatMap(Arrays::stream).distinct()
+			.map(g -> g.getChangedData().keySet()).flatMap(Collection::stream).forEach(data ->
 				FileUtil.writeln("node\t" + data.id + "\tcolor\t" + vtc.getColorInString(data.getChangeValue()),
 					writer2));
 
@@ -334,7 +360,7 @@ public class GraphWriter
 
 		relations.forEach(rel ->
 		{
-			String key = rel.relation.source + "\t" + rel.relation.type.name + "\t" + rel.relation.target;
+			String key = rel.source + "\t" + rel.type.name + "\t" + rel.target;
 			if (relMem.contains(key)) return;
 			else relMem.add(key);
 
@@ -342,10 +368,10 @@ public class GraphWriter
 			edges.add(edge);
 			Map<String, Object> dMap = new HashMap<>();
 			edge.put("data", dMap);
-			dMap.put("source", rel.relation.source);
-			dMap.put("target", rel.relation.target);
-			dMap.put("edgeType", rel.relation.type.name);
-			dMap.put("tooltipText", CollectionUtil.merge(rel.relation.getTargetWithSites(0), ", "));
+			dMap.put("source", rel.source);
+			dMap.put("target", rel.target);
+			dMap.put("edgeType", rel.type.name);
+			dMap.put("tooltipText", CollectionUtil.merge(rel.getTargetWithSites(0), ", "));
 		});
 
 		Set<String> totalProtUsedUp = new HashSet<>();
@@ -386,7 +412,7 @@ public class GraphWriter
 			{
 				let = "c";
 			}
-			else if (data instanceof ExpressionData)
+			else if (data instanceof RNAData)
 			{
 				let = "e";
 			}
@@ -396,8 +422,8 @@ public class GraphWriter
 				bor = inJSONString(activatingBorderColor);
 			}
 
-			String tooltip = data.id;
-			if (data.hasChangeDetector()) tooltip += ", " + data.getChangeValue();
+			String siteID = data.id;
+			String val = data.hasChangeDetector() ? data.getChangeValue() + "" : "";
 
 			for (String sym : data.getGeneSymbols())
 			{
@@ -416,32 +442,36 @@ public class GraphWriter
 
 				Map node = geneMap.get(sym);
 
+				if (nsc != null)
+				{
+					if (nsc.isDownstreamSignificant(sym))
+					{
+						if (!node.containsKey("css")) node.put("css", new HashMap<>());
+
+						((Map) node.get("css")).put("borderWidth", "2px");
+					}
+					boolean act = false;
+					boolean inh = false;
+
+					if (nsc instanceof NSCForNonCorr)
+					{
+						act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(sym);
+						inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(sym);
+					}
+
+					if (act || inh && !node.containsKey("css")) node.put("css", new HashMap<>());
+
+					if (act && !inh) ((Map) node.get("css")).put("borderColor", inJSONString(activatingBorderColor));
+					else if (!act && inh) ((Map) node.get("css")).put("borderColor", inJSONString(inhibitingBorderColor));
+					else if (act /** && inh **/) ((Map) node.get("css")).put("borderColor", inJSONString(doubleSignificanceBorderColor));
+				}
+
 				if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(sym))
 				{
 					if (!node.containsKey("css")) node.put("css", new HashMap<>());
 					((Map) node.get("css")).put("backgroundColor", colS);
-					((Map) node.get("data")).put("tooltipText", tooltip);
+					((Map) node.get("data")).put("tooltipText", val.isEmpty() ? siteID : siteID + ", " + val);
 					totalProtUsedUp.add(sym);
-
-					if (nsc != null)
-					{
-						if (nsc.isDownstreamSignificant(sym))
-						{
-							((Map) node.get("css")).put("borderWidth", "2px");
-						}
-						boolean act = false;
-						boolean inh = false;
-
-						if (nsc instanceof NSCForNonCorr)
-						{
-							act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(sym);
-							inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(sym);
-						}
-
-						if (act && !inh) ((Map) node.get("css")).put("borderColor", inJSONString(activatingBorderColor));
-						else if (!act && inh) ((Map) node.get("css")).put("borderColor", inJSONString(inhibitingBorderColor));
-						else if (act /** && inh **/) ((Map) node.get("css")).put("borderColor", inJSONString(doubleSignificanceBorderColor));
-					}
 				}
 				else
 				{
@@ -449,7 +479,7 @@ public class GraphWriter
 					((List) ((Map) node.get("data")).get("sites")).add(site);
 
 					site.put("siteText", let);
-					site.put("siteInfo", tooltip);
+					site.put("siteInfo", siteID);
 					site.put("siteBackgroundColor", colS);
 					site.put("siteBorderColor", bor);
 				}
@@ -463,21 +493,41 @@ public class GraphWriter
 
 	private Set<ExperimentData> getExperimentDataToDraw()
 	{
-		Set<ExperimentData> dataInGraph = relations.stream().map(r -> new ExperimentData[]{r.source, r.target})
-			.flatMap(Arrays::stream).collect(Collectors.toSet());
+		if (experimentDataToDraw != null) return experimentDataToDraw;
 
-		Set<String> symInGraph = relations.stream().map(r -> new String[]{r.relation.source, r.relation.target})
-			.flatMap(Arrays::stream).collect(Collectors.toSet());
-
-		Set<ExperimentData> otherData = Stream.concat(
-			relations.stream().map(r -> r.relation).map(r -> r.sourceData).flatMap(Collection::stream),
-			relations.stream().map(r -> r.relation).map(r -> r.targetData).flatMap(Collection::stream)).distinct()
-			.filter(d -> (d instanceof ExpressionData || d instanceof CNAData) && !dataInGraph.contains(d))
-			.filter(d -> symInGraph.contains(d.getGeneSymbols().iterator().next()))
-			.filter(d -> d.hasChangeDetector() && d.getChangeSign() != 0)
+		Set<ExperimentData> datas = Stream.concat(
+			relations.stream().map(r -> r.sourceData.getChangedData().keySet()).flatMap(Collection::stream),
+			relations.stream().map(r -> r.targetData.getChangedData().keySet()).flatMap(Collection::stream))
 			.collect(Collectors.toSet());
 
-		dataInGraph.addAll(otherData);
-		return dataInGraph;
+		if (otherGenesToShow != null)
+		{
+			datas.addAll(otherGenesToShow.stream().map(GeneWithData::getData).flatMap(Collection::stream)
+				.collect(Collectors.toSet()));
+		}
+
+		return datas;
+
+//		Set<ExperimentData> dataInGraph = relations.stream().map(r -> new ExperimentData[]{r.source, r.target})
+//			.flatMap(Arrays::stream).collect(Collectors.toSet());
+//
+//		Set<String> symInGraph = relations.stream().map(r -> new String[]{r.source, r.target})
+//			.flatMap(Arrays::stream).collect(Collectors.toSet());
+//
+//		Set<ExperimentData> otherData = Stream.concat(
+//			relations.stream().map(r -> r.sourceData.getChangedData().keySet()).flatMap(Collection::stream),
+//			relations.stream().map(r -> r.targetData.getChangedData().keySet()).flatMap(Collection::stream)).distinct()
+//			.filter(d -> (d instanceof ExpressionData || d instanceof CNAData) && !dataInGraph.contains(d))
+//			.filter(d -> symInGraph.contains(d.getGeneSymbols().iterator().next()))
+//			.collect(Collectors.toSet());
+//
+//		dataInGraph.addAll(otherData);
+//		return dataInGraph;
+	}
+
+	private Set<String> getGenesInGraph()
+	{
+		return relations.stream().map(r -> new String[]{r.source, r.target}).flatMap(Arrays::stream)
+			.collect(Collectors.toSet());
 	}
 }

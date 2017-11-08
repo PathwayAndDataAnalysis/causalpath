@@ -16,6 +16,9 @@ public class GraphFilter
 	 */
 	private RelationFilterType relationFilterType;
 
+	/**
+	 * A set of genes to trim the network to their neighborhood.
+	 */
 	private Set<String> focusGenes;
 
 	/**
@@ -48,36 +51,43 @@ public class GraphFilter
 		this.relationFilterType = RelationFilterType.NO_FILTER;
 	}
 
-	public Set<RelationAndSelectedData> filter(Set<RelationAndSelectedData> results)
+	/**
+	 * Trims the network either to specific relation types or to the neighborhood of specific genes or both.
+	 * @param results the network
+	 * @return trimmed network
+	 */
+	public Set<Relation> filter(Set<Relation> results)
 	{
+		// Trim with relation type
+
 		switch (relationFilterType)
 		{
 			case NO_FILTER:
-			case PHOSPHO_ONLY: results = results.stream().filter(r -> r.relation.type == RelationType.PHOSPHORYLATES ||
-				r.relation.type == RelationType.DEPHOSPHORYLATES).collect(Collectors.toSet());
+				break;
+			case PHOSPHO_ONLY: results = results.stream().filter(r -> r.type.affectsPhosphoSite).collect(Collectors.toSet());
 				break;
 			case EXPRESSION_ONLY: results = results.stream()
-				.filter(r -> r.relation.type == RelationType.UPREGULATES_EXPRESSION ||
-				r.relation.type == RelationType.DOWNREGULATES_EXPRESSION).collect(Collectors.toSet());
+				.filter(r -> r.type.affectsTotalProt).collect(Collectors.toSet());
 				break;
 			case PHOSPHO_PRIMARY_EXPRESSION_SECONDARY:
 			{
 				Set<String> genes = getGenesInPhoshoGraph(results);
-				results = results.stream().filter(r -> r.relation.type == RelationType.PHOSPHORYLATES ||
-					r.relation.type == RelationType.DEPHOSPHORYLATES ||
-					genes.contains(r.source.id) ||
-					genes.contains(r.target.id))
+				results = results.stream().filter(r -> r.type.affectsPhosphoSite ||
+					genes.contains(r.source) ||
+					genes.contains(r.target))
 					.collect(Collectors.toSet());
 				break;
 			}
 			default: throw new RuntimeException("Unhandled relation filter type: " + relationFilterType);
 		}
 
+		// Trim with focus genes
+
 		if (focusGenes != null && !focusGenes.isEmpty())
 		{
 			results = results.stream().filter(r ->
-				focusGenes.contains(r.relation.source) ||
-				focusGenes.contains(r.relation.target)).collect(Collectors.toSet());
+				focusGenes.contains(r.source) ||
+				focusGenes.contains(r.target)).collect(Collectors.toSet());
 		}
 
 		return results;
@@ -96,39 +106,53 @@ public class GraphFilter
 	/**
 	 * Gets the set of IDs of the genes that has at least one phospho relation coming in or going out.
 	 */
-	private Set<String> getGenesInPhoshoGraph(Set<RelationAndSelectedData> results)
+	private Set<String> getGenesInPhoshoGraph(Set<Relation> results)
 	{
-		return results.stream().filter(r -> r.relation.type == RelationType.PHOSPHORYLATES ||
-			r.relation.type == RelationType.DEPHOSPHORYLATES)
-			.map(r -> new String[]{r.source.id, r.target.id}).flatMap(Arrays::stream).collect(Collectors.toSet());
+		return results.stream().filter(r -> r.type.affectsPhosphoSite).map(r -> new String[]{r.source, r.target})
+			.flatMap(Arrays::stream).collect(Collectors.toSet());
 	}
 
-
+	/**
+	 * Type of the relation type filtering.
+	 */
 	public enum RelationFilterType
 	{
-		NO_FILTER ("no-filter", "The graph is used with all inferred relations."),
-		PHOSPHO_ONLY ("phospho-only", "Only phosphorylation relations are desired."),
-		EXPRESSION_ONLY ("expression-only", "Only expression relations are desired."),
-		PHOSPHO_PRIMARY_EXPRESSION_SECONDARY ("phospho-primary-expression-secondary", "All phosphorylation relations " +
+		NO_FILTER ("The graph is used with all inferred relations."),
+		PHOSPHO_ONLY ("Only phosphorylation relations are desired."),
+		EXPRESSION_ONLY ("Only expression relations are desired."),
+		PHOSPHO_PRIMARY_EXPRESSION_SECONDARY ("All phosphorylation relations " +
 			"are desired. Expression relations are desired only as supplemental, i.e., they have to involve at least " +
 			"one protein that exists in phospho graph.");
 
-		String name;
 		String description;
 
-		RelationFilterType(String name, String description)
+		RelationFilterType(String description)
 		{
-			this.name = name;
 			this.description = description;
+		}
+
+		public String getName()
+		{
+			return toString().toLowerCase().replaceAll("_", "-");
 		}
 
 		public static RelationFilterType get(String s)
 		{
 			for (RelationFilterType relationFilterType : values())
 			{
-				if (relationFilterType.name.equals(s)) return relationFilterType;
+				if (relationFilterType.getName().equals(s)) return relationFilterType;
 			}
 			return null;
+		}
+
+		public static String getUsageInfo()
+		{
+			StringBuilder sb = new StringBuilder();
+			for (RelationFilterType type : values())
+			{
+				sb.append("\t").append(type.getName()).append(": ").append(type.description).append("\n");
+			}
+			return sb.toString();
 		}
 	}
 }

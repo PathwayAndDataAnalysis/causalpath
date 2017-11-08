@@ -17,4 +17,10 @@ public class CNAData extends CategoricalData
 		copy.data = data;
 		return copy;
 	}
+
+	@Override
+	public DataType getType()
+	{
+		return DataType.CNA;
+	}
 }

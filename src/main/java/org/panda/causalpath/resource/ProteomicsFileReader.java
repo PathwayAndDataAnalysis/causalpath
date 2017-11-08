@@ -1,11 +1,6 @@
 package org.panda.causalpath.resource;
 
-import org.panda.causalpath.data.ActivityData;
-import org.panda.causalpath.data.ExperimentData;
-import org.panda.causalpath.data.PhosphoProteinData;
-import org.panda.causalpath.data.ProteinData;
 import org.panda.resource.tcga.ProteomicsFileRow;
-import org.panda.utility.ArrayUtil;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -13,7 +8,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * This class reads a proteomics file that is specially formatted to use in this framework. This is a tab-delimited data
@@ -47,65 +41,57 @@ public class ProteomicsFileReader
 	 * @param effectName name of the effect column
 	 */
 	public static List<ProteomicsFileRow> readAnnotation(String filename, String idname, String symbolname,
-		String psitename, String effectName)
+		String psitename, String effectName) throws FileNotFoundException
 	{
-		try
+		List<ProteomicsFileRow> datas = new ArrayList<>();
+
+		Scanner sc = new Scanner(new File(filename));
+		String s = sc.nextLine();
+		List<String> cols = Arrays.asList(s.split("\t"));
+
+		int colInd = cols.indexOf(idname);
+		int symbolInd = cols.indexOf(symbolname);
+		int siteInd = cols.indexOf(psitename);
+		int effectInd = effectName == null ? -1 : cols.indexOf(effectName);
+
+		while (sc.hasNextLine())
 		{
-			List<ProteomicsFileRow> datas = new ArrayList<>();
+			String[] row = sc.nextLine().split("\t");
+			String id = row[colInd];
+			String syms = row[symbolInd];
+			String sites = row.length > siteInd ? row[siteInd] : "";
+			String effect = effectInd >= 0 && row.length > effectInd ? row[effectInd] : null;
 
-			Scanner sc = new Scanner(new File(filename));
-			String s = sc.nextLine();
-			List<String> cols = Arrays.asList(s.split("\t"));
-
-			int colInd = cols.indexOf(idname);
-			int symbolInd = cols.indexOf(symbolname);
-			int siteInd = cols.indexOf(psitename);
-			int effectInd = effectName == null ? -1 : cols.indexOf(effectName);
-
-			while (sc.hasNextLine())
+			List<String> genes = Arrays.asList(syms.split("\\s+"));
+			Map<String, List<String>> siteMap = sites.isEmpty() ? null : new HashMap<>();
+			if (!sites.isEmpty())
 			{
-				String[] row = sc.nextLine().split("\t");
-				String id = row[colInd];
-				String syms = row[symbolInd];
-				String sites = row.length > siteInd ? row[siteInd] : "";
-				String effect = effectInd >= 0 && row.length > effectInd ? row[effectInd] : null;
-
-				List<String> genes = Arrays.asList(syms.split("\\s+"));
-				Map<String, List<String>> siteMap = sites.isEmpty() ? null : new HashMap<>();
-				if (!sites.isEmpty())
+				String[] perGene = sites.split("\\s+");
+				for (int i = 0; i < perGene.length; i++)
 				{
-					String[] perGene = sites.split("\\s+");
-					for (int i = 0; i < perGene.length; i++)
+					siteMap.put(genes.get(i), Arrays.asList(perGene[i].split("\\|")));
+				}
+				if (siteMap.size() < genes.size())
+				{
+					for (int i = siteMap.size(); i < genes.size(); i++)
 					{
-						siteMap.put(genes.get(i), Arrays.asList(perGene[i].split("\\|")));
-					}
-					if (siteMap.size() < genes.size())
-					{
-						for (int i = siteMap.size(); i < genes.size(); i++)
-						{
-							siteMap.put(genes.get(i), siteMap.get(genes.get(0)));
-						}
+						siteMap.put(genes.get(i), siteMap.get(genes.get(0)));
 					}
 				}
-
-				ProteomicsFileRow data = new ProteomicsFileRow(id, null, genes, siteMap);
-
-				if (effect != null)
-				{
-					data.effect = effect.equals("c") ? ProteomicsFileRow.SiteEffect.COMPLEX :
-						effect.equals("a") ? ProteomicsFileRow.SiteEffect.ACTIVATING : effect.equals("i") ?
-							ProteomicsFileRow.SiteEffect.INHIBITING : null;
-				}
-
-				datas.add(data);
 			}
-			return datas;
+
+			ProteomicsFileRow data = new ProteomicsFileRow(id, null, genes, siteMap);
+
+			if (effect != null)
+			{
+				data.effect = effect.equals("c") ? ProteomicsFileRow.SiteEffect.COMPLEX :
+					effect.equals("a") ? ProteomicsFileRow.SiteEffect.ACTIVATING : effect.equals("i") ?
+						ProteomicsFileRow.SiteEffect.INHIBITING : null;
+			}
+
+			datas.add(data);
 		}
-		catch (FileNotFoundException e)
-		{
-			e.printStackTrace();
-			return null;
-		}
+		return datas;
 	}
 
 	/**

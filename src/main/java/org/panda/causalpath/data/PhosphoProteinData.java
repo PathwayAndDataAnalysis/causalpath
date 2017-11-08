@@ -95,4 +95,10 @@ public class PhosphoProteinData extends ProteinData
 	{
 		this.siteMap = siteMap;
 	}
+
+	@Override
+	public DataType getType()
+	{
+		return DataType.PHOSPHOPROTEIN;
+	}
 }

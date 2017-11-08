@@ -29,4 +29,10 @@ public class DifferenceDetector extends ComparisonDetector
 		}
 		return 0;
 	}
+
+	@Override
+	public OneDataChangeDetector makeACopy()
+	{
+		return new DifferenceDetector(threshold, control, test);
+	}
 }

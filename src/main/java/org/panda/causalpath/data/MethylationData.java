@@ -26,4 +26,10 @@ public class MethylationData extends NumericData
 		copy.vals = vals;
 		return copy;
 	}
+
+	@Override
+	public DataType getType()
+	{
+		return DataType.METHYLATION;
+	}
 }

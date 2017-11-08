@@ -1,18 +1,16 @@
 package org.panda.causalpath.run;
 
 import org.panda.causalpath.analyzer.CausalitySearcher;
-import org.panda.causalpath.analyzer.RelationTargetCompatibilityChecker;
 import org.panda.causalpath.analyzer.ThresholdDetector;
 import org.panda.causalpath.data.ActivityData;
 import org.panda.causalpath.data.ProteinData;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
-import org.panda.causalpath.network.RelationAndSelectedData;
+import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.causalpath.resource.ProteomicsFileReader;
 import org.panda.causalpath.resource.ProteomicsLoader;
-import org.panda.causalpath.resource.NetworkLoader;
-import org.panda.resource.PhosphoSitePlus;
 import org.panda.resource.ResourceDirectory;
+import org.panda.resource.siteeffect.SiteEffectCollective;
 import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.io.IOException;
@@ -71,8 +69,9 @@ public class CausalityAnalysisSingleMethodInterface
 		List<String> vals = Collections.singletonList(valueColumn);
 		ProteomicsFileReader.addValues(rows, valuesFile, idColumn, vals, 0D, false);
 
-		// Fill-in missing effect from PhosphoSitePlus
-		PhosphoSitePlus.get().fillInMissingEffect(rows, siteEffectProximityThreshold);
+		// Fill-in missing effect
+		SiteEffectCollective sec = new SiteEffectCollective();
+		sec.fillInMissingEffect(rows, siteEffectProximityThreshold);
 
 		generateCausalityGraph(rows, valueThreshold, graphType, doSiteMatch, siteMatchProximityThreshold,
 			geneCentric, colorSaturationValue, outputFilePrefix);
@@ -100,21 +99,17 @@ public class CausalityAnalysisSingleMethodInterface
 		loader.associateChangeDetector(new ThresholdDetector(valueThreshold, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN), data -> data instanceof ProteinData);
 		loader.associateChangeDetector(new ThresholdDetector(0.1, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN), data -> data instanceof ActivityData);
 
-		// Prepare relation-target compatibility checker
-		RelationTargetCompatibilityChecker rtcc = new RelationTargetCompatibilityChecker();
-		rtcc.setForceSiteMatching(doSiteMatch);
-		rtcc.setSiteProximityThreshold(siteMatchProximityThreshold);
-
 		// Load signed relations
 		Set<Relation> relations = NetworkLoader.load();
-		loader.decorateRelations(relations, rtcc);
+		loader.decorateRelations(relations);
 
 		// Prepare causality searcher
-		CausalitySearcher cs = new CausalitySearcher(rtcc);
-		if (graphType.toLowerCase().startsWith("conflict")) cs.setCausal(false);
+		CausalitySearcher cs = new CausalitySearcher(!graphType.toLowerCase().startsWith("conflict"));
+		cs.setForceSiteMatching(doSiteMatch);
+		cs.setSiteProximityThreshold(siteMatchProximityThreshold);
 
 		// Search causal or conflicting relations
-		Set<RelationAndSelectedData> relDat =  cs.run(relations);
+		Set<Relation> relDat =  cs.run(relations);
 
 		GraphWriter writer = new GraphWriter(relDat);
 		writer.setUseGeneBGForTotalProtein(true);

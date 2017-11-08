@@ -26,6 +26,10 @@ public class CorrelationDetector implements TwoDataChangeDetector
 	 */
 	protected double pvalThreshold;
 
+	protected int minimumSampleSize;
+
+	protected double correlationUpperThreshold;
+
 	/**
 	 * If no threshold is needed, pass -1 for that threshold.
 	 */
@@ -33,6 +37,8 @@ public class CorrelationDetector implements TwoDataChangeDetector
 	{
 		this.correlationThreshold = correlationThreshold;
 		this.pvalThreshold = pvalThreshold;
+		minimumSampleSize = 3;
+		correlationUpperThreshold = -1; // negative value meaning not set
 	}
 
 	public void setCorrelationThreshold(double correlationThreshold)
@@ -43,6 +49,16 @@ public class CorrelationDetector implements TwoDataChangeDetector
 	public void setPvalThreshold(double pvalThreshold)
 	{
 		this.pvalThreshold = pvalThreshold;
+	}
+
+	public void setMinimumSampleSize(int minimumSampleSize)
+	{
+		this.minimumSampleSize = minimumSampleSize;
+	}
+
+	public void setCorrelationUpperThreshold(double correlationUpperThreshold)
+	{
+		this.correlationUpperThreshold = correlationUpperThreshold;
 	}
 
 	@Override
@@ -56,6 +72,9 @@ public class CorrelationDetector implements TwoDataChangeDetector
 			NumericData nd2 = (NumericData) data2;
 
 			double[][] v = ArrayUtil.trimNaNs(nd1.vals, nd2.vals);
+
+			if (v[0].length < minimumSampleSize) return 0;
+
 			Tuple corr = Correlation.pearson(v[0], v[1]);
 
 			if (pvalThreshold > 0)
@@ -66,6 +85,7 @@ public class CorrelationDetector implements TwoDataChangeDetector
 			// it passes p-val thr at this point, if such a threshold exists.
 
 			if (correlationThreshold > 0 && Math.abs(corr.v) < correlationThreshold) return 0;
+			if (correlationUpperThreshold > 0 && Math.abs(corr.v) > correlationUpperThreshold) return 0;
 			return (int) Math.signum(corr.v);
 		}
 

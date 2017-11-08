@@ -19,11 +19,11 @@ import java.util.stream.Collectors;
  */
 public class DownstreamCounter
 {
-	RelationTargetCompatibilityChecker rtcc;
+	CausalitySearcher cs;
 
-	public DownstreamCounter(RelationTargetCompatibilityChecker rtcc)
+	public DownstreamCounter(CausalitySearcher cs)
 	{
-		this.rtcc = rtcc;
+		this.cs = cs;
 	}
 
 	public Map<String, Integer>[] run(Set<Relation> relations)
@@ -33,18 +33,35 @@ public class DownstreamCounter
 		Map<String, Set<String>> inhib = new HashMap<>();
 
 		relations.forEach(r ->
-			r.targetData.stream().filter(d -> d.getChangeSign() != 0).filter(d -> rtcc.isCompatible(null, r, d)).forEach(d ->
+		{
+			Set<ExperimentData> td = cs.getExplainableTargetData(r);
+
+			if (!td.isEmpty())
 			{
 				if (!total.containsKey(r.source)) total.put(r.source, new HashSet<>());
 				if (!activ.containsKey(r.source)) activ.put(r.source, new HashSet<>());
 				if (!inhib.containsKey(r.source)) inhib.put(r.source, new HashSet<>());
+			}
 
-				total.get(r.source).add(r.target);
+			td.forEach(d ->
+			{
+				int sign = d.getChangeSign() * r.getSign();
 
-				int sign = r.getSign() * d.getChangeSign();
-				if (sign == 1) activ.get(r.source).add(r.target);
-				else inhib.get(r.source).add(r.target);
-			}));
+				if (sign != 0)
+				{
+					total.get(r.source).add(r.target);
+				}
+
+				if (sign == 1)
+				{
+					activ.get(r.source).add(r.target);
+				}
+				else if (sign == -1)
+				{
+					inhib.get(r.source).add(r.target);
+				}
+			});
+		});
 
 		return new Map[]{convertToCounts(total), convertToCounts(activ), convertToCounts(inhib)};
 	}

@@ -1,8 +1,8 @@
 package org.panda.causalpath.analyzer;
 
 import org.panda.causalpath.data.*;
+import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
-import org.panda.causalpath.network.RelationAndSelectedData;
 import org.panda.utility.CollectionUtil;
 
 import java.util.*;
@@ -16,107 +16,397 @@ public class CausalitySearcher
 	/**
 	 * If that is false, then we are interested in conflicting relations.
 	 */
-	private boolean causal = true;
+	private int causal;
 
 	/**
-	 * When there is a total protein measurement for a gene, we may prefer it to override its RNA expression data. This
-	 * set is used to mark those proteins whose RNA expression will be ignored in the analysis.
+	 * If this is false, then we don't care if the target site of a relation and the site on the data matches.
 	 */
-	private Set<String> genesWithTotalProteinData;
+	private boolean forceSiteMatching;
 
-	private RelationTargetCompatibilityChecker rtcc;
+	/**
+	 * When site matching is on, this parameter determines the largest value of the mismatch between relation and data
+	 * to consider it as a match. Set this to 0 for the most strict match.
+	 */
+	private int siteProximityThreshold;
 
-	public CausalitySearcher(RelationTargetCompatibilityChecker rtcc)
+	/**
+	 * When this is true, the data whose effect is 0, but potentially can be part of the causal network if known, are
+	 * collected.
+	 */
+	boolean collectDataWithMissingEffect;
+
+	/**
+	 * The interesting subset of phosphorylation data with unknown effect.
+	 */
+	private Set<PhosphoProteinData> dataNeedsAnnotation;
+
+	/**
+	 * When this is true, the data that are used for inference of causality or conflict are saved in a set.
+	 */
+	boolean collectDataUsedForInference;
+
+	/**
+	 * The set of data that is used during inference of causality.
+	 */
+	private Set<ExperimentData> dataUsedForInference;
+
+	/**
+	 * Set of pairs of data that contributed to inference.
+	 */
+	private Set<Set<ExperimentData>> pairsUsedForInference;
+
+	/**
+	 * If true, then an expression relation has to have an Activity data at its source.
+	 */
+	protected boolean mandateActivityDataUpstreamOfExpression;
+
+	/**
+	 * When true, this class uses only the strongest changing proteomic data with known effect as general activity
+	 * evidence.
+	 */
+	protected boolean useStrongestProteomicsDataForActivity;
+
+	/**
+	 * Data types that indicate activity change.
+	 */
+	Set<DataType> generalActivityChangeIndicators;
+
+	/**
+	 * A graph filter if needed to use at the end of network inference.
+	 */
+	GraphFilter graphFilter;
+
+	/**
+	 * Constructor with the reasoning type.
+	 * @param causal true:causal, false:conflicting
+	 */
+	public CausalitySearcher(boolean causal)
 	{
-		this.rtcc = rtcc;
+		setCausal(causal);
+		this.forceSiteMatching = true;
+		this.siteProximityThreshold = 0;
+		this.collectDataWithMissingEffect = false;
+		this.collectDataUsedForInference = false;
+		this.mandateActivityDataUpstreamOfExpression = false;
+		this.useStrongestProteomicsDataForActivity = false;
+
+		this.generalActivityChangeIndicators = new HashSet<>(Arrays.asList(
+			DataType.PROTEIN, DataType.PHOSPHOPROTEIN, DataType.ACTIVITY));
 	}
 
 	/**
 	 * Finds compatible or conflicting relations. The relations have to be associated with experiment data. Both the
 	 * experiment data and the relations have to be associated with related change detectors.
 	 */
-	public Set<RelationAndSelectedData> run(Set<Relation> relations)
+	public Set<Relation> run(Set<Relation> relations)
 	{
-		Set<RelationAndSelectedData> selected = new HashSet<>();
-		int compatible = causal ? 1 : -1;
-
-		for (Relation relation : relations)
+		if (collectDataWithMissingEffect)
 		{
-			for (ExperimentData source : relation.sourceData)
-			{
-				if (skip(source, relation.source)) continue;
-//				if (source instanceof ExpressionData) continue;
-//				if (!(source instanceof MutationData)) continue;
-
-				for (ExperimentData target : relation.targetData)
-				{
-					if (skip(target, relation.target)) continue;
-					if (!rtcc.isCompatible(source, relation, target)) continue;
-
-					int chgSign = relation.chDet.getChangeSign(source, target);
-					int sign = chgSign * source.getEffect() * relation.getSign();
-					if (sign == compatible)
-					{
-						selected.add(new RelationAndSelectedData(relation, source, target));
-					}
-				}
-			}
+			dataNeedsAnnotation = new HashSet<>();
 		}
-		return selected;
+		if (collectDataUsedForInference)
+		{
+			dataUsedForInference = new HashSet<>();
+			pairsUsedForInference = new HashSet<>();
+		}
+
+		Set<Relation> results = relations.stream().filter(this::satisfiesCriteria).collect(Collectors.toSet());
+
+		if (graphFilter != null)
+		{
+			results = graphFilter.filter(results);
+		}
+
+		return results;
 	}
 
 	/**
-	 * Finds the sites with unknown effect, whose determination of effect can make the result graph larger.
+	 * Checks if the relation explains/conflicts the associated data.
+	 * @param relation relation to check
+	 * @return true if explanatory
 	 */
-	public Set<ExperimentData> findDataThatNeedsAnnotation(Set<Relation> relations, Set<RelationAndSelectedData> selected)
+	public boolean satisfiesCriteria(Relation relation)
 	{
-		// Find the genes with a downstream in the results.
-		Set<String> usedGene = selected.stream().map(r -> r.source.id).collect(Collectors.toSet());
+		// Get data of target gene this relation can explain the change
+		Set<ExperimentData> td = getExplainableTargetData(relation);
 
-		// The data we want to identify
-		Set<ExperimentData> datas = new HashSet<>();
-
-		for (Relation relation : relations)
+		if (!td.isEmpty())
 		{
-			if (usedGene.contains(relation.source)) continue;
+			// Get data of the source gene that can be cause of this relation
+			Set<ExperimentData> sd = getAffectingSourceData(relation);
 
-			for (ExperimentData source : relation.sourceData)
+			if (!sd.isEmpty())
 			{
-				if (skip(source, relation.source)) continue;
-
-				for (ExperimentData target : relation.targetData)
-				{
-					if (skip(target, relation.target)) continue;
-					if (!rtcc.isCompatible(source, relation, target)) continue;
-
-					int chgSign = relation.chDet.getChangeSign(source, target) * relation.getSign();
-
-					if (chgSign != 0 && source.getEffect() == 0)
-					{
-						datas.add(source);
-					}
-				}
+				return satisfiesCriteria(sd, relation, td);
 			}
 		}
-		return datas;
+		return false;
 	}
 
 	/**
-	 * Checks if the experiment data needs to be ignored because there is a total protein data.
+	 * Checks if any pair from the given source and target data can be explained by the given relation.
+	 * @param sd source data
+	 * @param rel the relation
+	 * @param td target data
+	 * @return true if any sd td pair is explained/conflicted by the given relation
 	 */
-	private boolean skip(ExperimentData data, String gene)
+	private boolean satisfiesCriteria(Set<ExperimentData> sd, Relation rel, Set<ExperimentData> td)
 	{
-		return genesWithTotalProteinData != null && genesWithTotalProteinData.contains(gene) &&
-			(data instanceof ExpressionData || data instanceof CNAData);
+		for (ExperimentData sourceData : sd)
+		{
+			for (ExperimentData targetData : td)
+			{
+				if (satisfiesCriteria(rel, sourceData, targetData)) return true;
+			}
+		}
+
+		return false;
 	}
 
-	public void setGenesWithTotalProteinData(Set<String> genesWithTotalProteinData)
+	/**
+	 * Checks if the relation can explain/conflict the given source target data pair.
+	 * @param rel the relation
+	 * @param sourceData the source data
+	 * @param targetData the target data
+	 * @return true if the relation can explain/conflict the given data pair
+	 */
+	private boolean satisfiesCriteria(Relation rel, ExperimentData sourceData, ExperimentData targetData)
 	{
-		this.genesWithTotalProteinData = genesWithTotalProteinData;
+		int e = rel.chDet.getChangeSign(sourceData, targetData) * rel.getSign();
+
+		if (e != 0 && collectDataWithMissingEffect && sourceData.getEffect() == 0)
+		{
+			dataNeedsAnnotation.add((PhosphoProteinData) sourceData);
+		}
+		else if (sourceData.getEffect() * e == causal)
+		{
+			if (collectDataUsedForInference)
+			{
+				dataUsedForInference.add(sourceData);
+				dataUsedForInference.add(targetData);
+				pairsUsedForInference.add(new HashSet<>(Arrays.asList(sourceData, targetData)));
+			}
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Gets the source data that match with the given relation and target data.
+	 * @param rel the relation
+	 * @param target target data
+	 * @return the set of matching source data
+	 */
+	public Set<ExperimentData> getSatisfyingSourceData(Relation rel, ExperimentData target)
+	{
+		return getAffectingSourceData(rel).stream()
+			.filter(source -> satisfiesCriteria(rel, source, target))
+			.collect(Collectors.toSet());
+	}
+
+	/**
+	 * Gets the set of target data that the given relation can potentially explain its change. but that is without
+	 * checking the value changes, only by data types.
+	 * @param rel the relation
+	 * @return the set of target data explainable by the relation
+	 */
+	public Set<ExperimentData> getExplainableTargetData(Relation rel)
+	{
+		if (rel.type.affectsPhosphoSite)
+		{
+			return getEvidenceForPhosphoChange(rel.targetData).stream()
+				.filter(d -> isPhosphoTargetCompatible(rel, (PhosphoProteinData) d)).collect(Collectors.toSet());
+		}
+		else if (rel.type.affectsTotalProt)
+		{
+			return getEvidenceForExpressionChange(rel.targetData);
+		}
+		else if (rel.type.affectsGTPase)
+		{
+			return getEvidenceForGTPaseChange(rel.targetData);
+		}
+
+		throw new RuntimeException("Code should not reach here. Is there a new relation type to handle?");
+	}
+
+	/**
+	 * Checks if target sites match for the relation and the data.
+	 * @param rel the relation
+	 * @param target target data
+	 * @return true if there is a match or no match needed
+	 */
+	public boolean isPhosphoTargetCompatible(Relation rel, PhosphoProteinData target)
+	{
+		return !forceSiteMatching || !CollectionUtil.intersectionEmpty(
+			rel.getTargetWithSites(siteProximityThreshold), target.getGenesWithSites());
+	}
+
+	/**
+	 * Gets the source data that can be cause of this relation. This is without checking any change in values, only by
+	 * data types.
+	 * @param rel the relation
+	 * @return the set of source data that can be affecting
+	 */
+	public Set<ExperimentData> getAffectingSourceData(Relation rel)
+	{
+		if (rel.type.affectsPhosphoSite)
+		{
+			return getUpstreamEvidenceForPhosphoChange(rel.sourceData);
+		}
+		else if (rel.type.affectsTotalProt)
+		{
+			return getUpstreamEvidenceForExpressionChange(rel.sourceData);
+		}
+		else if (rel.type.affectsGTPase)
+		{
+			return getUpstreamEvidenceForGTPaseChange(rel.sourceData);
+		}
+
+		throw new RuntimeException("Code should not reach here. There must be a new relation type to handle.");
+	}
+
+	/**
+	 * Gets the evidence for activity change of a gene in terms of the associated data. This method does not evaluate a
+	 * change in values but only assesses the valid data types.
+	 * @param gene the gene
+	 * @return the data with potential to indicate activity change
+	 */
+	public Set<ExperimentData> getGeneralActivationEvidence(GeneWithData gene)
+	{
+		Set<ExperimentData> set = new HashSet<>();
+
+		for (DataType type : generalActivityChangeIndicators)
+		{
+			set.addAll(gene.getData(type));
+		}
+
+		if (useStrongestProteomicsDataForActivity)
+		{
+			removeShadowedProteomicData(set);
+		}
+
+		return set;
+	}
+
+	public Set<ExperimentData> getUpstreamEvidenceForPhosphoChange(GeneWithData gene)
+	{
+		return getGeneralActivationEvidence(gene);
+	}
+
+	public Set<ExperimentData> getUpstreamEvidenceForExpressionChange(GeneWithData gene)
+	{
+		if (mandateActivityDataUpstreamOfExpression) return gene.getData(DataType.ACTIVITY);
+		else return getGeneralActivationEvidence(gene);
+	}
+
+	public Set<ExperimentData> getUpstreamEvidenceForGTPaseChange(GeneWithData gene)
+	{
+		return getGeneralActivationEvidence(gene);
+	}
+
+	public Set<ExperimentData> getEvidenceForPhosphoChange(GeneWithData gene)
+	{
+		return gene.getData(DataType.PHOSPHOPROTEIN);
+	}
+
+	public Set<ExperimentData> getEvidenceForExpressionChange(GeneWithData gene)
+	{
+		return gene.getData(DataType.PROTEIN);
+	}
+
+	public Set<ExperimentData> getEvidenceForGTPaseChange(GeneWithData gene)
+	{
+		return gene.getData(DataType.ACTIVITY);
+	}
+
+	/**
+	 * This method iterates over total protein and phosphoprotein data that has a known effect, and leaves only the one
+	 * with the biggest change, removes others. This is sometimes useful for complexity management.
+	 * @param data data to select from
+	 */
+	protected void removeShadowedProteomicData(Set<ExperimentData> data)
+	{
+		if (data.size() > 1)
+		{
+			Optional<ProteinData> opt = data.stream().filter(d -> d instanceof ProteinData && d.getEffect() != 0)
+				.map(d -> (ProteinData) d).sorted((d1, d2) ->
+					Double.valueOf(Math.abs(d2.getChangeValue())).compareTo(Math.abs(d1.getChangeValue()))).findFirst();
+
+			if (opt.isPresent())
+			{
+				ExperimentData ed = opt.get();
+				data.removeIf(d -> d instanceof ProteinData && d != ed);
+			}
+		}
 	}
 
 	public void setCausal(boolean causal)
 	{
-		this.causal = causal;
+		this.causal = causal ? 1 : -1;
+	}
+
+	public Set<PhosphoProteinData> getDataNeedsAnnotation()
+	{
+		return dataNeedsAnnotation;
+	}
+
+	public Set<ExperimentData> getDataUsedForInference()
+	{
+		return dataUsedForInference;
+	}
+
+	public Set<Set<ExperimentData>> getPairsUsedForInference()
+	{
+		return pairsUsedForInference;
+	}
+
+	public void setCollectDataUsedForInference(boolean collect)
+	{
+		this.collectDataUsedForInference = collect;
+	}
+
+	public void setCollectDataWithMissingEffect(boolean collect)
+	{
+		this.collectDataWithMissingEffect = collect;
+	}
+
+	public void setMandateActivityDataUpstreamOfExpression(boolean mandate)
+	{
+		this.mandateActivityDataUpstreamOfExpression = mandate;
+	}
+
+	public void setUseStrongestProteomicsDataForActivity(boolean use)
+	{
+		this.useStrongestProteomicsDataForActivity = use;
+	}
+
+	public void addDataTypeForGeneralActivity(DataType type)
+	{
+		generalActivityChangeIndicators.add(type);
+	}
+
+	public void setForceSiteMatching(boolean forceSiteMatching)
+	{
+		this.forceSiteMatching = forceSiteMatching;
+	}
+
+	public void setSiteProximityThreshold(int siteProximityThreshold)
+	{
+		this.siteProximityThreshold = siteProximityThreshold;
+	}
+
+	public void setGraphFilter(GraphFilter graphFilter)
+	{
+		this.graphFilter = graphFilter;
+	}
+
+	public boolean hasGraphFilter()
+	{
+		return graphFilter != null;
+	}
+
+	public GraphFilter getGraphFilter()
+	{
+		return graphFilter;
 	}
 }

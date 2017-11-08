@@ -28,4 +28,10 @@ public class FoldChangeDetector extends ComparisonDetector
 		}
 		throw new RuntimeException("Non-numeric data is trying to use a fold-change detector. data = " + data);
 	}
+
+	@Override
+	public OneDataChangeDetector makeACopy()
+	{
+		return new FoldChangeDetector(threshold, control, test);
+	}
 }

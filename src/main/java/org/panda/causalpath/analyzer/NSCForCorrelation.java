@@ -2,10 +2,9 @@ package org.panda.causalpath.analyzer;
 
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
-import org.panda.causalpath.network.RelationAndSelectedData;
-import org.panda.utility.ArrayUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.Progress;
+import org.panda.utility.statistics.FDR;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -14,7 +13,6 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 
 /**
  * Calculates the significance of several things in the result network. These are the size of the network overall, and
@@ -32,15 +30,15 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 	/**
 	 * Constructor with the network.
 	 */
-	public NSCForCorrelation(Set<Relation> relations)
+	public NSCForCorrelation(Set<Relation> relations, CausalitySearcher cs)
 	{
-		super(relations);
+		super(relations, cs);
 	}
 
-	public NSCForCorrelation(Set<Relation> relations, boolean forceSiteMatching, int siteProximityThreshold,
-		boolean causal, GraphFilter graphFilter)
+	@Override
+	public void setFDRThreshold(double fdrThr)
 	{
-		super(relations, forceSiteMatching, siteProximityThreshold, causal, graphFilter);
+		setPvalThreshold(FDR.getPValueThreshold(pvals, null, fdrThr));
 	}
 
 	/**
@@ -48,16 +46,16 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 	 */
 	public void run(int iterations)
 	{
+		// Turn off missing data collection utility
+		cs.setCollectDataWithMissingEffect(false);
+
 		// Get current statistics
-		DownstreamCounter dc = new DownstreamCounterForCorrelation(rtcc, causal);
+		DownstreamCounter dc = new DownstreamCounterForCorrelation(cs);
 		Map<String, Integer> current = dc.run(relations)[0];
 
 		// Get a run with non-randomized data to find current size
-		CausalitySearcher cs = new CausalitySearcher(rtcc);
-		cs.setCausal(causal);
-		Set<RelationAndSelectedData> result = cs.run(relations);
-		if (graphFilter != null) result = graphFilter.filter(result);
-		int sizeCurrent = (int) result.stream().map(r -> r.relation).distinct().count();
+		Set<Relation> result = cs.run(relations);
+		int sizeCurrent = result.size();
 
 		int sizeCnt = 0;
 
@@ -87,10 +85,9 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 
 			// Generate a result network for the randomized data
 			result = cs.run(rels);
-			if (graphFilter != null) result = graphFilter.filter(result);
 
 			// Note if the network is as big
-			if (result.stream().map(r -> r.relation).distinct().count() >= sizeCurrent) sizeCnt++;
+			if (result.size() >= sizeCurrent) sizeCnt++;
 
 			prog.tick();
 		}

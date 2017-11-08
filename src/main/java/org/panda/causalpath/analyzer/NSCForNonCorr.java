@@ -1,20 +1,19 @@
 package org.panda.causalpath.analyzer;
 
-import org.apache.poi.util.IntList;
-import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
-import org.panda.causalpath.network.RelationAndSelectedData;
-import org.panda.resource.CancerGeneCensus;
-import org.panda.resource.OncoKB;
 import org.panda.utility.ArrayUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.Progress;
+import org.panda.utility.statistics.FDR;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,17 +32,27 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	Map<String, Double>[] pvalMaps;
 
 	/**
-	 * Constructor with the network.
+	 * Constructor with required objects.
+	 * @param relations set of relations to process
+	 * @param cs the configured causality searcher
 	 */
-	public NSCForNonCorr(Set<Relation> relations)
+	public NSCForNonCorr(Set<Relation> relations, CausalitySearcher cs)
 	{
-		super(relations);
+		super(relations, cs);
 	}
 
-	public NSCForNonCorr(Set<Relation> relations, boolean forceSiteMatching, int siteProximityThreshold,
-		boolean causal, GraphFilter graphFilter)
+	@Override
+	public void setFDRThreshold(double fdrThr)
 	{
-		super(relations, forceSiteMatching, siteProximityThreshold, causal, graphFilter);
+		Map<String, Double> pvals = new HashMap<>();
+		for (int i = 0; i < pvalMaps.length; i++)
+		{
+			for (String gene : pvalMaps[i].keySet())
+			{
+				pvals.put(gene + "::" + i, pvalMaps[i].get(gene));
+			}
+		}
+		setPvalThreshold(FDR.getPValueThreshold(pvals, null, fdrThr));
 	}
 
 	/**
@@ -51,24 +60,18 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	 */
 	public void run(int iterations)
 	{
+		// Turn off missing site effect collector
+		cs.setCollectDataWithMissingEffect(false);
+
 		// Get current statistics
-		DownstreamCounter dc = new DownstreamCounter(rtcc);
+		DownstreamCounter dc = new DownstreamCounter(cs);
 		Map<String, Integer>[] current = dc.run(relations);
 
-		// Get the set of cancer genes in cancer gene databases.
-		Set<String> cancerGenes = new HashSet<>(OncoKB.get().getAllSymbols());
-		cancerGenes.addAll(CancerGeneCensus.get().getAllSymbols());
-
 		// Get a run with non-randomized data to find current size
-		CausalitySearcher cs = new CausalitySearcher(rtcc);
-		cs.setCausal(causal);
-		Set<RelationAndSelectedData> result = cs.run(relations);
-		if (graphFilter != null) result = graphFilter.filter(result);
-		long sizeCurrent = result.stream().map(r -> r.relation).distinct().count();
-		long currentCGCnt = getGenes(result).stream().filter(cancerGenes::contains).count();
+		Set<Relation> result = cs.run(relations);
+		long sizeCurrent = result.size();
 
 		long sizeCnt = 0;
-		long cgCnt = 0;
 
 		// Init counters for the randomizations
 		Map<String, Integer>[] cnt = new Map[3];
@@ -103,13 +106,9 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 
 			// Generate a result network for the randomized data
 			result = cs.run(rels);
-			if (graphFilter != null) result = graphFilter.filter(result);
 
 			// Note if the network is as big
-			if (result.stream().map(r -> r.relation).distinct().count() >= sizeCurrent) sizeCnt++;
-
-			long cgCount = getGenes(result).stream().filter(cancerGenes::contains).count();
-			if (cgCount >= currentCGCnt) cgCnt++;
+			if (result.size() >= sizeCurrent) sizeCnt++;
 
 			prog.tick();
 		}
@@ -117,7 +116,6 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 		// Convert counts to p-values
 
 		graphSizePval = sizeCnt / (double) iterations;
-		pvalForCGEnrichment = cgCnt / (double) iterations;
 
 		this.pvalMaps = new Map[3];
 		for (int i = 0; i < 3; i++)
@@ -135,12 +133,11 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	/**
 	 * Gets the genes in a result set.
 	 */
-	private Set<String> getGenes(Set<RelationAndSelectedData> result)
+	private Set<String> getGenes(Set<Relation> result)
 	{
-		return result.stream().map(r -> new String[]{r.relation.source, r.relation.target}).flatMap(Arrays::stream)
+		return result.stream().map(r -> new String[]{r.source, r.target}).flatMap(Arrays::stream)
 			.collect(Collectors.toSet());
 	}
-
 
 	public Map<String, Double> getDownstreamActivityPvals()
 	{
@@ -165,6 +162,11 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 		return getInhibitoryPvals().containsKey(gene) && getInhibitoryPvals().get(gene) <= significanceThreshold;
 	}
 
+	/**
+	 * Gets the minimum of 3 pvals for the gene.
+	 * @param gene the gene
+	 * @return minimum pval
+	 */
 	private Double getMinimumPval(String gene)
 	{
 		double p = 1;
@@ -172,6 +174,27 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 		if (pvalMaps[1].containsKey(gene) && pvalMaps[1].get(gene) < p) p = pvalMaps[1].get(gene);
 		if (pvalMaps[2].containsKey(gene) && pvalMaps[2].get(gene) < p) p = pvalMaps[2].get(gene);
 		return p;
+	}
+
+	/**
+	 * Returns significant genes using the current p-value threshold.
+	 * @return significant genes
+	 */
+	public Map<String, Integer> getSignificantGenes()
+	{
+		Map<String, Integer> sig = new HashMap<>();
+		for (String gene : pvalMaps[0].keySet())
+		{
+			Integer i = null;
+			if (pvalMaps[1].get(gene) <= significanceThreshold) i = 1;
+			if (pvalMaps[2].get(gene) <= significanceThreshold)
+			{
+				i = i == null ? -1 : 0;
+			}
+
+			if (i != null) sig.put(gene, i);
+		}
+		return sig;
 	}
 
 	public void writeResults(String filename) throws IOException

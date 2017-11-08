@@ -67,4 +67,10 @@ public class MutationData extends CategoricalData
 		copy.data = data;
 		return copy;
 	}
+
+	@Override
+	public DataType getType()
+	{
+		return DataType.MUTATION;
+	}
 }

@@ -2,12 +2,12 @@ package org.panda.causalpath.network;
 
 import org.panda.causalpath.analyzer.TwoDataChangeDetector;
 import org.panda.causalpath.data.ExperimentData;
+import org.panda.causalpath.data.GeneWithData;
 import org.panda.causalpath.data.PhosphoSite;
 import org.panda.utility.CollectionUtil;
 
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -33,12 +33,12 @@ public class Relation
 	/**
 	 * Set of experiment data associated with source gene.
 	 */
-	public Set<ExperimentData> sourceData;
+	public GeneWithData sourceData;
 
 	/**
 	 * Set of experiment data associated with target gene.
 	 */
-	public Set<ExperimentData> targetData;
+	public GeneWithData targetData;
 
 	/**
 	 * Pathway Commons IDs of the mediator objects for the relation.
@@ -62,8 +62,6 @@ public class Relation
 		this.target = target;
 		this.type = type;
 		this.mediators = mediators;
-		sourceData = new HashSet<>();
-		targetData = new HashSet<>();
 	}
 
 	/**
@@ -74,19 +72,15 @@ public class Relation
 		return type.sign;
 	}
 
-	/**
-	 * Fills the data resources using the given bag.
-	 */
-	public void pickRelatedExperimentData(Map<String, Set<ExperimentData>> map)
-	{
-		if (map.containsKey(source)) sourceData.addAll(map.get(source));
-		if (map.containsKey(target)) targetData.addAll(map.get(target));
-	}
-
 	public String toString()
 	{
 		return source + "\t" + type.name + "\t" + target + "\t" + mediators +
 			(sites == null ? "" : "\t" + CollectionUtil.merge(sites, ";"));
+	}
+
+	public String getMediators()
+	{
+		return mediators;
 	}
 
 	public Set<String> getTargetWithSites(int proximityThr)
@@ -102,6 +96,11 @@ public class Relation
 			}
 		}
 		return set;
+	}
+
+	public Set<ExperimentData> getAllData()
+	{
+		return CollectionUtil.getUnion(sourceData.getData(), targetData.getData());
 	}
 
 	public void setChDet(TwoDataChangeDetector chDet)

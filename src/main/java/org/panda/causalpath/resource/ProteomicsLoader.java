@@ -2,16 +2,11 @@ package org.panda.causalpath.resource;
 
 import org.panda.causalpath.analyzer.CausalityHelper;
 import org.panda.causalpath.analyzer.OneDataChangeDetector;
-import org.panda.causalpath.analyzer.RelationTargetCompatibilityChecker;
-import org.panda.causalpath.data.ActivityData;
-import org.panda.causalpath.data.ExperimentData;
-import org.panda.causalpath.data.PhosphoProteinData;
-import org.panda.causalpath.data.ProteinData;
+import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.Relation;
 import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Coverts the RPPAData in resource project to appropriate objects for this project and serves them.
@@ -52,16 +47,57 @@ public class ProteomicsLoader
 	/**
 	 * Adds the related data to the given relations.
 	 */
-	public void decorateRelations(Set<Relation> relations, RelationTargetCompatibilityChecker rtcc)
+	public void decorateRelations(Set<Relation> relations)
 	{
+		Map<String, GeneWithData> map = collectExistingData(relations);
 		CausalityHelper ch = new CausalityHelper();
-		for (Relation relation : relations)
+		for (Relation rel : relations)
 		{
-			if (dataMap.containsKey(relation.source)) relation.sourceData.addAll(dataMap.get(relation.source));
-			if (dataMap.containsKey(relation.target)) relation.targetData.addAll(dataMap.get(relation.target).stream()
-				.filter(d -> rtcc.isCompatible(null, relation, d)).collect(Collectors.toSet()));
-			relation.chDet = ch;
+			if (rel.sourceData == null)
+			{
+				if (map.containsKey(rel.source))
+				{
+					rel.sourceData = map.get(rel.source);
+				}
+				else
+				{
+					GeneWithData gwd = new GeneWithData(rel.source);
+					gwd.addAll(dataMap.get(rel.source));
+					map.put(gwd.getId(), gwd);
+				}
+			}
+			else rel.sourceData.addAll(dataMap.get(rel.source));
+
+			if (rel.targetData == null)
+			{
+				if (map.containsKey(rel.target))
+				{
+					rel.targetData = map.get(rel.target);
+				}
+				else
+				{
+					GeneWithData gwd = new GeneWithData(rel.target);
+					gwd.addAll(dataMap.get(rel.target));
+					map.put(gwd.getId(), gwd);
+				}
+			}
+			else rel.targetData.addAll(dataMap.get(rel.target));
+
+			rel.chDet = ch;
 		}
+	}
+
+	private Map<String, GeneWithData> collectExistingData(Set<Relation> relations)
+	{
+		Map<String, GeneWithData> map = new HashMap<>();
+
+		for (Relation rel : relations)
+		{
+			if (rel.sourceData != null) map.put(rel.sourceData.getId(), rel.sourceData);
+			if (rel.targetData != null) map.put(rel.targetData.getId(), rel.targetData);
+		}
+
+		return map;
 	}
 
 	/**

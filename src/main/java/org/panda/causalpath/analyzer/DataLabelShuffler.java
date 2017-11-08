@@ -5,7 +5,6 @@ import org.panda.causalpath.network.Relation;
 
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * This class is for shuffling the rows of the data. It first converts data in simpler format, then provides shuffling
@@ -16,12 +15,32 @@ import java.util.stream.Stream;
 public class DataLabelShuffler
 {
 	Set<Relation> relations;
-	List<double[]> valuesList;
-	List<SingleCategoricalData[]> catsList;
-	List<NumericData> numDatas;
-	List<CategoricalData> catDatas;
+
+	Map<DataType, List<NumericData>> numDataLists;
+	Map<DataType, List<CategoricalData>> catDataLists;
+	Map<DataType, List<double[]>> numDataVals;
+	Map<DataType, List<SingleCategoricalData[]>> catDataVals;
+
+	/**
+	 * Empty constructor for the extending class.
+	 */
+	protected DataLabelShuffler()
+	{
+	}
 
 	public DataLabelShuffler(Set<Relation> relations)
+	{
+		init(relations);
+
+		CausalityHelper ch = new CausalityHelper();
+		this.relations.forEach(r -> r.setChDet(ch));
+
+		ChDet det = new ChDet();
+		this.relations.stream().map(Relation::getAllData).flatMap(Collection::stream).distinct()
+			.forEach(d -> d.setChDet(det));
+	}
+
+	protected void init(Set<Relation> relations)
 	{
 		this.relations = new HashSet<>();
 
@@ -30,43 +49,59 @@ public class DataLabelShuffler
 		for (Relation origRel : relations)
 		{
 			Relation copy = origRel.copy();
-			copy.sourceData.addAll(convert(origRel.sourceData, dataMap));
-			copy.targetData.addAll(convert(origRel.targetData, dataMap));
+			copy.sourceData = convert(origRel.sourceData, dataMap);
+			copy.targetData = convert(origRel.targetData, dataMap);
 			this.relations.add(copy);
 		}
 
-		CausalityHelper ch = new CausalityHelper();
-		this.relations.forEach(r -> r.setChDet(ch));
+		numDataLists = new HashMap<>();
+		catDataLists = new HashMap<>();
+		numDataVals = new HashMap<>();
+		catDataVals = new HashMap<>();
+		for (DataType type : DataType.values())
+		{
+			List<ExperimentData> list = this.relations.stream().map(Relation::getAllData).flatMap(Collection::stream)
+				.filter(d -> d.getType().equals(type)).distinct().collect(Collectors.toList());
 
-		numDatas = Stream.concat(this.relations.stream().map(r -> r.sourceData).flatMap(Collection::stream),
-			this.relations.stream().map(r -> r.targetData).flatMap(Collection::stream))
-			.filter(d -> d instanceof NumericData).map(d -> (NumericData) d).distinct()
-			.collect(Collectors.toList());
-
-		catDatas = Stream.concat(this.relations.stream().map(r -> r.sourceData).flatMap(Collection::stream),
-			this.relations.stream().map(r -> r.targetData).flatMap(Collection::stream))
-			.filter(d -> d instanceof CategoricalData).map(d -> (CategoricalData) d).distinct()
-			.collect(Collectors.toList());
-
-		ChDet det = new ChDet();
-		numDatas.forEach(d -> d.setChDet(det));
-		catDatas.forEach(d -> d.setChDet(det));
-
-		valuesList = numDatas.stream().map(d -> d.vals).collect(Collectors.toList());
-		catsList = catDatas.stream().map(d -> d.data).collect(Collectors.toList());
+			if (!list.isEmpty())
+			{
+				if (type.isNumerical())
+				{
+					numDataLists.put(type, list.stream().map(d -> (NumericData) d).collect(Collectors.toList()));
+					numDataVals.put(type, numDataLists.get(type).stream().map(d -> d.vals).collect(Collectors.toList()));
+				}
+				else
+				{
+					catDataLists.put(type, list.stream().map(d -> (CategoricalData) d).collect(Collectors.toList()));
+					catDataVals.put(type, catDataLists.get(type).stream().map(d -> d.data).collect(Collectors.toList()));
+				}
+			}
+		}
 	}
 
 	public void shuffle()
 	{
-		Collections.shuffle(valuesList);
-		Collections.shuffle(catsList);
-		for (int i = 0; i < numDatas.size(); i++)
+		for (DataType type : numDataLists.keySet())
 		{
-			numDatas.get(i).vals = valuesList.get(i);
+			List<double[]> vals = numDataVals.get(type);
+			Collections.shuffle(vals);
+
+			List<NumericData> list = numDataLists.get(type);
+			for (int i = 0; i < list.size(); i++)
+			{
+				list.get(i).vals = vals.get(i);
+			}
 		}
-		for (int i = 0; i < catDatas.size(); i++)
+		for (DataType type : catDataLists.keySet())
 		{
-			catDatas.get(i).data = catsList.get(i);
+			List<SingleCategoricalData[]> datas = catDataVals.get(type);
+			Collections.shuffle(datas);
+
+			List<CategoricalData> list = catDataLists.get(type);
+			for (int i = 0; i < list.size(); i++)
+			{
+				list.get(i).data = datas.get(i);
+			}
 		}
 	}
 
@@ -75,15 +110,20 @@ public class DataLabelShuffler
 		return relations;
 	}
 
-	private Set<ExperimentData> convert(Set<ExperimentData> origDatas, Map<String, ExperimentData> dataMap)
+	private GeneWithData convert(GeneWithData orig, Map<String, ExperimentData> dataMap)
 	{
-		return origDatas.stream().map(d -> convert(d, dataMap)).filter(d -> d != null).collect(Collectors.toSet());
+		GeneWithData copy = new GeneWithData(orig.getId());
+		for (ExperimentData data : orig.getData())
+		{
+			copy.add(convert(data, dataMap));
+		}
+		return copy;
 	}
 
 	/**
 	 * Makes a copy of the given data that is more efficient for randomization experiments.
 	 */
-	private ExperimentData convert(ExperimentData orig, Map<String, ExperimentData> dataMap)
+	protected ExperimentData convert(ExperimentData orig, Map<String, ExperimentData> dataMap)
 	{
 		if (dataMap.containsKey(orig.id)) return dataMap.get(orig.id);
 
@@ -129,6 +169,12 @@ public class DataLabelShuffler
 		public double getChangeValue(ExperimentData data)
 		{
 			return getChangeSign(data);
+		}
+
+		@Override
+		public OneDataChangeDetector makeACopy()
+		{
+			throw new UnsupportedOperationException("This is not a cloneable detector! Sorry.");
 		}
 	}
 }

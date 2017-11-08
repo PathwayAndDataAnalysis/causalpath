@@ -2,19 +2,11 @@ package org.panda.causalpath.analyzer;
 
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
-import org.panda.causalpath.network.RelationAndSelectedData;
-import org.panda.utility.ArrayUtil;
-import org.panda.utility.FileUtil;
-import org.panda.utility.Progress;
+import org.panda.utility.statistics.FDR;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 
 /**
  * Calculates the significance of several things in the result network. These are the size of the network overall, the
@@ -31,9 +23,9 @@ public abstract class NetworkSignificanceCalculator
 	protected Set<Relation> relations;
 
 	/**
-	 * Compatibility for source-relation-target triplet, without considering data compatibility.
+	 * Compatibility detector for source-relation-target triplet.
 	 */
-	protected RelationTargetCompatibilityChecker rtcc;
+	protected CausalitySearcher cs;
 
 	/**
 	 * P-value for the current graph size.
@@ -41,70 +33,64 @@ public abstract class NetworkSignificanceCalculator
 	protected double graphSizePval;
 
 	/**
-	 * A p-value for the enrichment of cancer genes in the result network.
-	 */
-	double pvalForCGEnrichment;
-
-	/**
-	 * Doing for either causal or conflicting graph.
-	 */
-	protected boolean causal;
-
-	/**
 	 * The p-value threshold fora significant change.
 	 */
 	protected double significanceThreshold;
 
 	/**
-	 * If set, this filter selects a subset of the detected relations as the result.
-	 */
-	protected GraphFilter graphFilter;
-
-	/**
 	 * Constructor with the network.
 	 */
-	public NetworkSignificanceCalculator(Set<Relation> relations)
+	public NetworkSignificanceCalculator(Set<Relation> relations, CausalitySearcher cs)
 	{
 		this.relations = relations;
-		this.rtcc = new RelationTargetCompatibilityChecker();
+		this.cs = cs;
 	}
 
-	public NetworkSignificanceCalculator(Set<Relation> relations, boolean forceSiteMatching, int siteProximityThreshold,
-		boolean causal, GraphFilter graphFilter)
-	{
-		this(relations);
-		rtcc.setForceSiteMatching(forceSiteMatching);
-		rtcc.setSiteProximityThreshold(siteProximityThreshold);
-		this.causal = causal;
-		this.graphFilter = graphFilter;
-	}
-
-	public void setSignificanceThreshold(double significanceThreshold)
+	public void setPvalThreshold(double significanceThreshold)
 	{
 		this.significanceThreshold = significanceThreshold;
 	}
 
-	public double getPvalForCGEnrichment()
-	{
-		return pvalForCGEnrichment;
-	}
+	/**
+	 * Sets the FDR threshold for the network significance.
+	 * @param fdrThr the FDR threshold
+	 */
+	public abstract void setFDRThreshold(double fdrThr);
 
 	/**
 	 * Performs a randomization experiment.
 	 */
 	public abstract void run(int iterations);
 
+	/**
+	 * Gets the p-val for the network size.
+	 * @return p-val
+	 */
 	public double getOverallGraphSizePval()
 	{
 		return graphSizePval;
 	}
 
+	/**
+	 * Gets the map of downstream activity size p-vals for each gene.
+	 * @return p-vals map
+	 */
 	public abstract Map<String, Double> getDownstreamActivityPvals();
 
+	/**
+	 * Checks if the amount of downstream activities are significantly large.
+	 * @param gene gene of interest
+	 * @return true if significantly large
+	 */
 	public boolean isDownstreamSignificant(String gene)
 	{
 		return getDownstreamActivityPvals().containsKey(gene) && getDownstreamActivityPvals().get(gene) <= significanceThreshold;
 	}
 
+	/**
+	 * Write gene significances to a file.
+	 * @param filename file name
+	 * @throws IOException
+	 */
 	public abstract void writeResults(String filename) throws IOException;
 }

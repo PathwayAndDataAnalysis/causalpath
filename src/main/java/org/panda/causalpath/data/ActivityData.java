@@ -31,4 +31,10 @@ public class ActivityData extends CategoricalData
 	{
 		return new ActivityData(id, getGeneSymbols().iterator().next());
 	}
+
+	@Override
+	public DataType getType()
+	{
+		return DataType.ACTIVITY;
+	}
 }
