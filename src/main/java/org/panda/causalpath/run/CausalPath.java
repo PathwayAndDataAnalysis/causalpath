@@ -1,11 +1,11 @@
 package org.panda.causalpath.run;
 
-import org.omg.CORBA.IDLType;
 import org.panda.causalpath.analyzer.*;
 import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
+import org.panda.causalpath.network.RelationType;
 import org.panda.causalpath.resource.NetworkLoader;
 import org.panda.causalpath.resource.ProteomicsFileReader;
 import org.panda.causalpath.resource.ProteomicsLoader;
@@ -13,6 +13,7 @@ import org.panda.causalpath.resource.TCGALoader;
 import org.panda.resource.ResourceDirectory;
 import org.panda.resource.siteeffect.SiteEffectCollective;
 import org.panda.resource.tcga.ProteomicsFileRow;
+import org.panda.utility.ArrayUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.statistics.FDR;
 
@@ -125,7 +126,7 @@ public class CausalPath
 	 * A correlation threshold when the value transformation is correlation. This is optional, but if not used, then
 	 * using the <code>thresholdForSignificance</code> is mandatory.
 	 */
-	private double pvalThresholdForCorrelation;
+	private double pvalThresholdForCorrelation = -1;
 
 	/**
 	 * A correlation FDR threshold when the value transformation is correlation. When this is used,
@@ -194,6 +195,10 @@ public class CausalPath
 
 	private boolean useNetworkSignificanceForCausalReasoning = false;
 
+	private int minimumPotentialTargetsToConsiderForDownstreamSignificance = 1;
+
+	private boolean showInsignificantProteinData = false;
+
 	/**
 	 * The search engine.
 	 */
@@ -203,9 +208,9 @@ public class CausalPath
 	{
 		if (args.length < 1)
 		{
-			System.err.println("Please specify the data directory that contains the \"" + PARAMETER_FILENAME + "\" " +
+			System.out.println("Please specify the data directory that contains the \"" + PARAMETER_FILENAME + "\" " +
 				"file, as the first and only program parameter. All other parameters must go into the parameters " +
-				"file.");
+				"file. Below are possible parameters in the parameters file.\n\n" + Parameter.getUsageInfo());
 			return;
 		}
 
@@ -282,17 +287,7 @@ public class CausalPath
 		readTFActivityFile(rows);
 
 		// Add activity changes from parameters file
-		if (activityMap != null)
-		{
-			for (String gene : activityMap.keySet())
-			{
-				int a = activityMap.get(gene);
-				ProteomicsFileRow activityRow = new ProteomicsFileRow(gene + "-" + (a < 0 ? "inactive" : "active"),
-					null, Collections.singletonList(gene), null);
-				activityRow.makeActivityNode(a > 0);
-				rows.add(activityRow);
-			}
-		}
+		addActivityChangesFromParametersFile(rows);
 
 		// Fill-in missing effects
 		SiteEffectCollective sec = new SiteEffectCollective();
@@ -313,13 +308,24 @@ public class CausalPath
 		Set<Relation> relations = networkSelection == null ? NetworkLoader.load() :
 			NetworkLoader.load(NetworkLoader.ResourceType.getSelectedResources(networkSelection));
 
+		System.out.println("Number of relations in the analysis before graph filtering = " + relations.size());
+		for (RelationType type : relations.stream().map(r -> r.type).collect(Collectors.toSet()))
+		{
+			System.out.println(type + " = " + relations.stream().filter(r -> r.type.equals(type)).count());
+		}
+
+		// Associate relations with the data
 		loader.decorateRelations(relations);
 
+		// Mark some decisions
 		boolean useCorrelation = transformation == ValueTransformation.CORRELATION;
+		boolean controlFDR = fdrThresholdForDataSignificance != null || fdrThresholdForCorrelation > 0;
+
+		// Init correlation detector if needed
 		CorrelationDetector corrDet = null;
 		if (useCorrelation)
 		{
-			corrDet = new CorrelationDetector(pvalThresholdForCorrelation, thresholdForDataSignificance);
+			corrDet = new CorrelationDetector(-1, controlFDR ? -1 : thresholdForDataSignificance);
 			if (minimumSampleSize != null) corrDet.setMinimumSampleSize(minimumSampleSize);
 			if (correlationUpperThreshold != null) corrDet.setCorrelationUpperThreshold(correlationUpperThreshold);
 
@@ -330,6 +336,245 @@ public class CausalPath
 		}
 
 		// Load other TCGA profiles if available
+		loadOtherAvailableTCGAProfiles(ctrl, test, vals, relations);
+
+		//---DEBUG
+//		PrepareBoxPlots.runWithRelations(relations, directory, "D3", "M3");
+//		ReportDifferentiallyExpressed.report(relations, directory + "/" + "differentially-expressed-proteins.txt");
+		//---END OF DEBUG
+
+		// Write down the value changes
+		if (!useCorrelation)
+		{
+			writeValueChanges(relations);
+		}
+
+		//---DEBUG
+//		RobustnessAnalysis ra = new RobustnessAnalysis(cs, relations, fdrThresholdForDataSignificance, 0.05,
+//			useCorrelation, fdrThresholdForCorrelation, corrDet);
+//		ra.run(1000, directory + "/robustness.txt");
+//		System.exit(0);
+		//---END OF DEBUG
+
+		// Search causal or conflicting relations
+		Set<Relation> causal = cs.run(relations);
+
+		if (controlFDR)
+		{
+			adjustPvalThresholdToFDR(relations, useCorrelation, corrDet, cs.copy(), cs.getDataUsedForInference(),
+				cs.getPairsUsedForInference(), causal);
+			causal = cs.run(relations);
+		}
+
+		// Significance calculation
+		NetworkSignificanceCalculator nsc = calculateNetworkSignificance(relations, useCorrelation, cs.copy());
+
+		// Add network significance as data if opted for
+
+		if (nsc != null && !useCorrelation && useNetworkSignificanceForCausalReasoning)
+		{
+			if (addNetworkSignificanceAsData(relations, (NSCForNonCorr) nsc))
+			{
+				// Run the inference again with new activity data
+				causal = cs.run(relations);
+			}
+		}
+
+		int causativeSize = causal.size();
+		System.out.println("Causative relations = " + causativeSize);
+
+		GraphWriter writer = new GraphWriter(causal, nsc);
+		writer.setUseGeneBGForTotalProtein(!useCorrelation);
+		writer.setColorSaturationValue(colorSaturationValue);
+
+		if (!useCorrelation && !showInsignificantProteinData)
+		{
+			Set<ExperimentData> set = new HashSet<>(cs.getDataUsedForInference());
+
+			if (showUnexplainedProteomicData)
+			{
+				relations.stream().map(r -> r.sourceData).map(GeneWithData::getChangedProteomicData)
+					.flatMap(Collection::stream).forEach(set::add);
+				relations.stream().map(r -> r.targetData).map(GeneWithData::getChangedProteomicData)
+					.flatMap(Collection::stream).forEach(set::add);
+			}
+
+			writer.setExperimentDataToDraw(set);
+		}
+
+		if (!useCorrelation && showUnexplainedProteomicData)
+		{
+			Set<GeneWithData> set = relations.stream().map(r -> r.sourceData).filter(GeneWithData::hasChangedProteomicData).collect(Collectors.toSet());
+			relations.stream().map(r -> r.targetData).filter(GeneWithData::hasChangedProteomicData).forEach(set::add);
+			writer.setOtherGenesToShow(set);
+		}
+		if (useCorrelation)
+		{
+			writer.setExperimentDataToDraw(cs.getPairsUsedForInference().stream().flatMap(Collection::stream)
+				.collect(Collectors.toSet()));
+		}
+
+		// Generate output
+		writer.writeSIFGeneCentric(directory + File.separator + CAUSATIVE_RESULT_FILE_PREFIX);
+		writer.writeJSON(directory + File.separator + CAUSATIVE_RESULT_FILE_PREFIX);
+		if (generateDataCentricGraph)
+		{
+			writer.writeSIFDataCentric(directory + File.separator + CAUSATIVE_RESULT_FILE_DATA_CENTRIC_PREFIX,
+				cs.getInferenceUnits());
+		}
+
+		// Note the sites with unknown effect whose determination will improve the results
+		writeSitesToCurate(cs.getDataNeedsAnnotation());
+
+		// Do the same for conflicting relations
+
+		cs.setCausal(false);
+		Set<Relation> conflicting =  cs.run(relations);
+		int conflictSize = conflicting.size();
+		System.out.println("Conflicting relations = " + conflictSize);
+
+		writer = new GraphWriter(conflicting, null);
+		writer.setUseGeneBGForTotalProtein(!useCorrelation);
+		writer.setColorSaturationValue(colorSaturationValue);
+		if (!showInsignificantProteinData) writer.setExperimentDataToDraw(cs.getDataUsedForInference());
+		if (useCorrelation)
+		{
+			writer.setExperimentDataToDraw(cs.getPairsUsedForInference().stream().flatMap(Collection::stream)
+				.collect(Collectors.toSet()));
+		}
+		writer.writeSIFGeneCentric(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
+		writer.writeJSON(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
+
+		// Report conflict/causal ratio
+		if (causativeSize > 0)
+		{
+			System.out.println("conflict / causative ratio = " + conflictSize / (double) causativeSize);
+		}
+
+		// Estimate accuracy if did a network propagation of data
+		PropagationAccuracyPredictor pred = new PropagationAccuracyPredictor();
+		double accuracy = pred.run(causal, conflicting, cs.copy());
+		System.out.println("accuracy = " + accuracy);
+	}
+
+	/**
+	 * Based on network significances, adds activation or inhibition data.
+	 * @param relations relation in the analysis
+	 * @param nsc the network significance calculator for non-correlation cases
+	 * @return true if any data is added
+	 */
+	public boolean addNetworkSignificanceAsData(Set<Relation> relations, NSCForNonCorr nsc)
+	{
+		Map<String, Integer> geneMap = nsc.getSignificantGenes();
+		Set<String> genes = geneMap.keySet();
+		if (!geneMap.isEmpty())
+		{
+			Map<String, GeneWithData> idToGene = relations.stream().map(r -> r.sourceData).filter(g -> genes.contains(g.getId())).distinct()
+				.collect(Collectors.toMap(GeneWithData::getId, g -> g));
+
+			OneDataChangeDetector chDet = new ThresholdDetector(
+				0.01, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN);
+
+			for (String id : genes)
+			{
+				GeneWithData gene = idToGene.get(id);
+
+				// If there is no data change on the gene, or if there is already an activity data associated with
+				// this gene, skip it
+				if (gene.getChangedData().isEmpty() || !gene.getData(DataType.ACTIVITY).isEmpty()) continue;
+
+				if (geneMap.get(id) == 1 || geneMap.get(id) == 0)
+				{
+					ActivityData data = new ActivityData(id + "-active-by-network-sig", id);
+					data.data = new SingleCategoricalData[]{new Activity(1)};
+					data.setChDet(chDet);
+					gene.add(data);
+				}
+				if (geneMap.get(id) == -1 || geneMap.get(id) == 0)
+				{
+					ActivityData data = new ActivityData(id + "-inactive-by-network-sig", id);
+					data.data = new SingleCategoricalData[]{new Activity(-1)};
+					data.setChDet(chDet);
+					gene.add(data);
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
+	public NetworkSignificanceCalculator calculateNetworkSignificance(Set<Relation> relations, boolean useCorrelation,
+		CausalitySearcher cs) throws IOException
+	{
+		NetworkSignificanceCalculator nsc = null;
+
+		if (calculateNetworkSignificance)
+		{
+			if (useCorrelation)
+			{
+				nsc = new NSCForCorrelation(relations, cs);
+			}
+			else
+			{
+				nsc = new NSCForNonCorr(relations, cs);
+			}
+
+			nsc.setMinimumPotentialTargetsToConsider(minimumPotentialTargetsToConsiderForDownstreamSignificance);
+			nsc.run(permutationCount);
+			nsc.setFDRThreshold(fdrThresholdForNetworkSignificance);
+			nsc.writeResults(directory + File.separator + SIGNIFICANCE_FILENAME);
+			System.out.println("Graph size pval = " + nsc.getOverallGraphSizePval());
+		}
+		return nsc;
+	}
+
+	public void adjustPvalThresholdToFDR(Set<Relation> relations, boolean useCorrelation, CorrelationDetector corrDet,
+		CausalitySearcher cs, Set<ExperimentData> datas, Set<Set<ExperimentData>> pairs, Set<Relation> relsfromFirstRun)
+	{
+
+		datas = new HashSet<>(datas);
+		pairs = new HashSet<>(pairs);
+		cs.setCausal(false);
+		cs.setCollectDataUsedForInference(true);
+		Set<Relation> testedRels = cs.run(relations);
+		testedRels.addAll(relsfromFirstRun);
+
+		// DEBUG---------------
+		System.out.println("Size of relations actually tested = " + testedRels.size());
+		saveRels(testedRels);
+		// DEBUG---------------
+
+		datas.addAll(cs.getDataUsedForInference());
+		pairs.addAll(cs.getPairsUsedForInference());
+		cs.setCausal(true);
+		if (useCorrelation)
+		{
+			FDRAdjusterForCorrelation fad = new FDRAdjusterForCorrelation(pairs, corrDet);
+			fad.adjustPValueThresholdsForFDR(fdrThresholdForCorrelation);
+		}
+		else
+		{
+			FDRAdjuster fad = new FDRAdjuster(poolProteomicsForFDRAdjustment);
+			fad.adjustPValueThresholdsOfDatas(datas, fdrThresholdForDataSignificance);
+		}
+	}
+
+	private void saveRels(Set<Relation> rels)
+	{
+		try
+		{
+			BufferedWriter writer = Files.newBufferedWriter(Paths.get("temp.sif"));
+			rels.forEach(r -> FileUtil.writeln(ArrayUtil.getString("\t", r.source, r.type.name, r.target), writer));
+			writer.close();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+
+	public void loadOtherAvailableTCGAProfiles(boolean[] ctrl, boolean[] test, List<String> vals, Set<Relation> relations) throws IOException
+	{
 		if (tcgaDirectory != null)
 		{
 			TCGALoader tcga = new TCGALoader(directory + File.separator + tcgaDirectory);
@@ -350,189 +595,21 @@ public class CausalPath
 				tcga.associateChangeDetector(chDet.makeACopy(), data -> data instanceof MutationData);
 			}
 		}
+	}
 
-		//---DEBUG
-//		PrepareBoxPlots.runWithRelations(relations, directory, "D3", "M3");
-//		ReportDifferentiallyExpressed.report(relations, directory + "/" + "differentially-expressed-proteins.txt");
-		//---END OF DEBUG
-
-		// Write down the value changes
-		if (!useCorrelation)
+	public void addActivityChangesFromParametersFile(List<ProteomicsFileRow> rows)
+	{
+		if (activityMap != null)
 		{
-			writeValueChanges(relations);
-		}
-
-		//---DEBUG
-//		RobustnessAnalysis ra = new RobustnessAnalysis(cs, relations, fdrThresholdForDataSignificance, 0.05);
-//		ra.run(100, directory + "/robustness.txt");
-//		System.exit(0);
-		//---END OF DEBUG
-
-		// Search causal or conflicting relations
-
-		boolean controlFDR = fdrThresholdForDataSignificance != null || fdrThresholdForCorrelation > 0;
-
-		if (!controlFDR) cs.setCollectDataWithMissingEffect(true);
-		else cs.setCollectDataUsedForInference(true);
-
-		Set<Relation> causal = cs.run(relations);
-
-		if (!controlFDR) cs.setCollectDataWithMissingEffect(false);
-
-		if (controlFDR)
-		{
-			Set<ExperimentData> datas = new HashSet<>(cs.getDataUsedForInference());
-			Set<Set<ExperimentData>> pairs = new HashSet<>(cs.getPairsUsedForInference());
-			cs.setCausal(false);
-			cs.run(relations);
-			datas.addAll(cs.getDataUsedForInference());
-			pairs.addAll(cs.getPairsUsedForInference());
-			cs.setCausal(true);
-			if (useCorrelation)
+			for (String gene : activityMap.keySet())
 			{
-				FDRAdjusterForCorrelation fad = new FDRAdjusterForCorrelation(pairs, corrDet);
-				fad.adjustPValueThresholdsForFDR(fdrThresholdForCorrelation);
-			}
-			else
-			{
-				FDRAdjuster fad = new FDRAdjuster(poolProteomicsForFDRAdjustment);
-				fad.adjustPValueThresholdsForRelations(relations, fdrThresholdForDataSignificance);
-				fad.adjustPValueThresholdsOfDatas(datas, fdrThresholdForDataSignificance);
-			}
-			cs.setCollectDataWithMissingEffect(true);
-			causal = cs.run(relations);
-
-			cs.setCollectDataWithMissingEffect(false);
-			cs.setCollectDataUsedForInference(false);
-		}
-
-		// Significance calculation
-		NetworkSignificanceCalculator nsc = null;
-
-		if (calculateNetworkSignificance)
-		{
-			if (useCorrelation)
-			{
-				nsc = new NSCForCorrelation(relations, cs);
-			}
-			else
-			{
-				nsc = new NSCForNonCorr(relations, cs);
-			}
-
-			nsc.run(permutationCount);
-			nsc.setFDRThreshold(fdrThresholdForNetworkSignificance);
-			nsc.writeResults(directory + File.separator + SIGNIFICANCE_FILENAME);
-			System.out.println("Graph size pval = " + nsc.getOverallGraphSizePval());
-		}
-
-		// Add network significance as data if opted for
-
-		if (calculateNetworkSignificance && !useCorrelation && useNetworkSignificanceForCausalReasoning)
-		{
-			Map<String, Integer> geneMap = ((NSCForNonCorr) nsc).getSignificantGenes();
-			Set<String> genes = geneMap.keySet();
-			if (!geneMap.isEmpty())
-			{
-				Map<String, GeneWithData> idToGene = relations.stream().map(r -> r.sourceData).filter(g -> genes.contains(g.getId())).distinct()
-					.collect(Collectors.toMap(GeneWithData::getId, g -> g));
-
-				OneDataChangeDetector chDet = new ThresholdDetector(
-					0.01, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN);
-
-				for (String id : genes)
-				{
-					GeneWithData gene = idToGene.get(id);
-
-					// If there is no data change on the gene, or if there is already an activity data associated with
-					// this gene, skip it
-					if (gene.getChangedData().isEmpty() || !gene.getData(DataType.ACTIVITY).isEmpty()) continue;
-
-					if (geneMap.get(id) == 1 || geneMap.get(id) == 0)
-					{
-						ActivityData data = new ActivityData(id + "-active-by-network-sig", id);
-						data.data = new SingleCategoricalData[]{new Activity(1)};
-						data.setChDet(chDet);
-						gene.add(data);
-					}
-					if (geneMap.get(id) == -1 || geneMap.get(id) == 0)
-					{
-						ActivityData data = new ActivityData(id + "-inactive-by-network-sig", id);
-						data.data = new SingleCategoricalData[]{new Activity(-1)};
-						data.setChDet(chDet);
-						gene.add(data);
-					}
-				}
-
-				// Run the inference again with new activity data
-
-				cs.setCollectDataWithMissingEffect(true);
-				cs.setCollectDataUsedForInference(true);
-				causal = cs.run(relations);
-				cs.setCollectDataWithMissingEffect(false);
-				cs.setCollectDataUsedForInference(false);
+				int a = activityMap.get(gene);
+				ProteomicsFileRow activityRow = new ProteomicsFileRow(gene + "-" + (a < 0 ? "inactive" : "active"),
+					null, Collections.singletonList(gene), null);
+				activityRow.makeActivityNode(a > 0);
+				rows.add(activityRow);
 			}
 		}
-
-		int causativeSize = causal.size();
-		System.out.println("Causative relations = " + causativeSize);
-
-		GraphWriter writer = new GraphWriter(causal, nsc);
-		writer.setUseGeneBGForTotalProtein(true);
-		writer.setColorSaturationValue(colorSaturationValue);
-
-		if (!useCorrelation && showUnexplainedProteomicData)
-		{
-			Set<GeneWithData> set = relations.stream().map(r -> r.sourceData).filter(GeneWithData::hasChangedProteinData).collect(Collectors.toSet());
-			relations.stream().map(r -> r.targetData).filter(GeneWithData::hasChangedProteinData).forEach(set::add);
-			writer.setOtherGenesToShow(set);
-		}
-		if (useCorrelation)
-		{
-			writer.setExperimentDataToDraw(cs.getPairsUsedForInference().stream().flatMap(Collection::stream)
-				.collect(Collectors.toSet()));
-		}
-
-		// Generate output
-		writer.writeSIFGeneCentric(directory + File.separator + CAUSATIVE_RESULT_FILE_PREFIX);
-		writer.writeJSON(directory + File.separator + CAUSATIVE_RESULT_FILE_PREFIX);
-		if (generateDataCentricGraph)
-		{
-			writer.writeSIFDataCentric(directory + File.separator + CAUSATIVE_RESULT_FILE_DATA_CENTRIC_PREFIX);
-		}
-
-		// Note the sites with unknown effect whose determination will improve the results
-		writeSitesToCurate(cs.getDataNeedsAnnotation());
-
-		// Do the same for conflicting relations
-
-		cs.setCausal(false);
-		cs.setCollectDataUsedForInference(true);
-		Set<Relation> conflicting =  cs.run(relations);
-		cs.setCollectDataUsedForInference(false);
-		int conflictSize = conflicting.size();
-		System.out.println("Conflicting relations = " + conflictSize);
-		writer = new GraphWriter(conflicting, null);
-		writer.setUseGeneBGForTotalProtein(true);
-		writer.setColorSaturationValue(colorSaturationValue);
-		if (useCorrelation)
-		{
-			writer.setExperimentDataToDraw(cs.getPairsUsedForInference().stream().flatMap(Collection::stream)
-				.collect(Collectors.toSet()));
-		}
-		writer.writeSIFGeneCentric(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
-		writer.writeJSON(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
-
-		// Report conflict/causal ratio
-		if (causativeSize > 0)
-		{
-			System.out.println("conflict / causative ratio = " + conflictSize / (double) causativeSize);
-		}
-
-		// Estimate accuracy if did a network propagation of data
-		PropagationAccuracyPredictor pred = new PropagationAccuracyPredictor();
-		double accuracy = pred.run(causal, conflicting, cs);
-		System.out.println("accuracy = " + accuracy);
 	}
 
 	/**
@@ -785,7 +862,7 @@ public class CausalPath
 				"different data type. The parameter value has to be in the form 'fdr-val data-type', such like " +
 				"'0.1 phosphoprotein'. Possible data types are below" ),
 		POOL_PROTEOMICS_FOR_FDR_ADJUSTMENT((value, cp) -> cp.poolProteomicsForFDRAdjustment = Boolean.valueOf(value),
-			"Whether to consider proteomic and phosphoproteomic data as a single dataset during FDR adjustment. This" +
+			"Whether to consider proteomic and phosphoproteomic data as a single dataset during FDR adjustment. This " +
 				"is typically the case with RPPA data, and typically not the case with mass spectrometry data. Can be" +
 				" 'true' or 'false'. Default is false."),
 		FDR_THRESHOLD_FOR_NETWORK_SIGNIFICANCE((value, cp) ->
@@ -901,6 +978,15 @@ public class CausalPath
 			"After calculation of network significances in a non-correlation-based analysis, this option introduces" +
 				" the detected active and inactive proteins as data to be used in the analysis. This applies only to " +
 				"the proteins that already have a changed data on them, and have no previous activity data associated."),
+		MINIMUM_POTENTIAL_TARGETS_TO_CONSIDER_FOR_DOWNSTREAM_SIGNIFICANCE((value, cp) ->
+			cp.minimumPotentialTargetsToConsiderForDownstreamSignificance = Integer.valueOf(value),
+			"While calculating downstream significance for each source gene, we may not like to include those genes " +
+				"with already few qualifying targets to reduce noise in data and reduce the number of tested " +
+				"hypotheses."),
+		SHOW_INSIGNIFICANT_PROTEOMIC_DATA((value, cp) ->
+			cp.showInsignificantProteinData = Boolean.valueOf(value),
+			"Option to make the insignificant protein data on the result graph visible. Seeing these is good for " +
+				"seeing what is being measured, but when they are too much, turning off generates a a better view."),
 		;
 
 		ParameterReader reader;

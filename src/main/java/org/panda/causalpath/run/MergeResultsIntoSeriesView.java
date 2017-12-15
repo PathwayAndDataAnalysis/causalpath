@@ -85,7 +85,7 @@ public class MergeResultsIntoSeriesView
 			Set<String> siteKeys = new HashSet<>();
 			for (String line : formatList)
 			{
-				if (line.contains("\trppasite\t"))
+				if (line.contains("\trppasite\t") && line.contains("|p|"))
 				{
 					String key = line.substring(0, line.indexOf("|"));
 					siteKeys.add(key);

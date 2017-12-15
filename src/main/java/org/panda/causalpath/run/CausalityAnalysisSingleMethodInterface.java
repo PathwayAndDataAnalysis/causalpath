@@ -117,7 +117,7 @@ public class CausalityAnalysisSingleMethodInterface
 
 		// Generate output
 		if (geneCentric) writer.writeSIFGeneCentric(outputFilePrefix);
-		else writer.writeSIFDataCentric(outputFilePrefix);
+		else writer.writeSIFDataCentric(outputFilePrefix, cs.getInferenceUnits());
 	}
 
 	// Test in class. Bad practice. Tsk tsk tsk

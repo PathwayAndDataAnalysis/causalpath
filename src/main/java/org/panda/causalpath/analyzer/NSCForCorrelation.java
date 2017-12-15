@@ -1,18 +1,21 @@
 package org.panda.causalpath.analyzer;
 
-import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
+import org.panda.utility.ArrayUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.Progress;
 import org.panda.utility.statistics.FDR;
+import org.panda.utility.statistics.KernelDensityPlot;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Calculates the significance of several things in the result network. These are the size of the network overall, and
@@ -46,12 +49,25 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 	 */
 	public void run(int iterations)
 	{
-		// Turn off missing data collection utility
-		cs.setCollectDataWithMissingEffect(false);
+		// Init counter
+		DownstreamCounter dc = new DownstreamCounterForCorrelation(cs);
+
+		Set<String> ignore = dc.getGenesWithNoPotential(relations);
 
 		// Get current statistics
-		DownstreamCounter dc = new DownstreamCounterForCorrelation(cs);
 		Map<String, Integer> current = dc.run(relations)[0];
+		relations.stream().map(r -> r.source).filter(gene -> !ignore.contains(gene) && !current.containsKey(gene))
+			.forEach(gene -> current.put(gene, 0));
+
+		// Get max possible counts for each source gene
+		Map<String, Integer> maxPotential = dc.getGenesPotentialDownstreamMax(relations);
+
+		if (minimumPotentialTargetsToConsider > 1)
+		{
+			new HashSet<>(current.keySet()).stream().filter(gene ->
+				!maxPotential.containsKey(gene) || maxPotential.get(gene) < minimumPotentialTargetsToConsider)
+				.forEach(current::remove);
+		}
 
 		// Get a run with non-randomized data to find current size
 		Set<Relation> result = cs.run(relations);
@@ -67,6 +83,7 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 		Set<Relation> rels = dls.getRelations();
 
 		Progress prog = new Progress(iterations, "Calculating significances");
+		double[] sizes = new double[iterations];
 
 		for (int i = 0; i < iterations; i++)
 		{
@@ -74,9 +91,19 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 			dls.shuffle();
 			Map<String, Integer> run = dc.run(rels)[0];
 
+			assert !run.keySet().stream().filter(ignore::contains).filter(gene -> run.get(gene) > 0).findAny()
+				.isPresent() : "Ignored gene contains non-zero downstream!";
+
 			// Count the cases shuffling provided as good results
 			for (String gene : run.keySet())
 			{
+				if (minimumPotentialTargetsToConsider > 1 && maxPotential.get(gene) < minimumPotentialTargetsToConsider)
+				{
+					continue;
+				}
+
+				assert !ignore.contains(gene);
+
 				if (!cnt.containsKey(gene)) cnt.put(gene, 0);
 				if (!current.containsKey(gene)) current.put(gene, 0);
 
@@ -89,8 +116,16 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 			// Note if the network is as big
 			if (result.size() >= sizeCurrent) sizeCnt++;
 
+			sizes[i] = result.size();
+
 			prog.tick();
 		}
+
+		// Plot graph size significance
+		Map<String, double[]> map = new HashMap<>();
+		map.put(ArrayUtil.mean(sizes) + " (mean of random)", sizes);
+		map.put(sizeCurrent + " (actual)", new double[]{sizeCurrent});
+		KernelDensityPlot.plot("Graph size distribution", map);
 
 		// Convert counts to p-values
 
@@ -115,7 +150,7 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 		BufferedWriter writer = Files.newBufferedWriter(Paths.get(filename));
 
 		writer.write("Overall graph size pval = " + getOverallGraphSizePval());
-		writer.write("\nGene\tDownstream crowded pval\tDownstream suggests activation pval\tDownstream suggests inhibition pval");
+		writer.write("\nGene\tDownstream crowded pval");
 
 		pvals.keySet().stream().sorted((g1, g2) -> pvals.get(g1).compareTo(pvals.get(g2))).forEach(gene ->
 			FileUtil.lnwrite(gene + "\t" + pvals.get(gene), writer));

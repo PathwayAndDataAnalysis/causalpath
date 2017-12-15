@@ -5,6 +5,7 @@ import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.NumericData;
 import org.panda.causalpath.network.Relation;
 import org.panda.utility.CollectionUtil;
+import org.panda.utility.Progress;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -27,21 +28,36 @@ public class RobustnessAnalysis
 
 	double noiseStDev;
 
-	public RobustnessAnalysis(CausalitySearcher cs, Set<Relation> relations, Map<DataType, Double> fdrThr, double noiseStDev)
+	boolean correlationBased;
+	double fdrThresholdForCorrelation;
+	CorrelationDetector corrDet;
+
+	Set<ExperimentData> data;
+	Set<Set<ExperimentData>> pairs;
+
+	public RobustnessAnalysis(CausalitySearcher cs, Set<Relation> relations, Map<DataType, Double> fdrThr,
+		double noiseStDev, boolean correlationBased, double fdrThresholdForCorrelation, CorrelationDetector corrDet)
 	{
 		this.cs = cs;
 		this.relations = relations;
 		this.fdrThr = fdrThr;
 		this.noiseStDev = noiseStDev;
+		this.correlationBased = correlationBased;
+		this.fdrThresholdForCorrelation = fdrThresholdForCorrelation;
+		this.corrDet = corrDet;
 	}
 
 	public void run(int iterations, String outFile) throws IOException
 	{
+		cs.setCollectDataUsedForInference(false);
+		cs.setCollectDataWithMissingEffect(false);
+
 		Set<Relation> trueRels = getARun(relations);
 
 		int[] trueCnt = new int[iterations];
 		int[] falseCnt = new int[iterations];
 
+		Progress p = new Progress(iterations, "Robustness analysis");
 		for (int i = 0; i < iterations; i++)
 		{
 			addNoise(relations);
@@ -52,6 +68,8 @@ public class RobustnessAnalysis
 
 			trueCnt[i] = overlap;
 			falseCnt[i] = newRels.size() - overlap;
+
+			p.tick();
 		}
 
 		BufferedWriter writer = Files.newBufferedWriter(Paths.get(outFile));
@@ -68,24 +86,48 @@ public class RobustnessAnalysis
 
 	private Set<Relation> getARun(Set<Relation> relations)
 	{
-		Stream.concat(relations.stream().map(r -> r.sourceData.getDataStream().map(ExperimentData::getChDet)),
-			relations.stream().map(r -> r.targetData.getDataStream().map(ExperimentData::getChDet)))
-			.filter(det -> det instanceof ThresholdDetector).forEach(det -> ((ThresholdDetector) det).setThreshold(1));
+		if (data == null && pairs == null)
+		{
+			if (!correlationBased)
+			{
+				Stream.concat(relations.stream().map(r -> r.sourceData.getDataStream().map(ExperimentData::getChDet)),
+					relations.stream().map(r -> r.targetData.getDataStream().map(ExperimentData::getChDet)))
+					.filter(det -> det instanceof ThresholdDetector).forEach(det -> ((ThresholdDetector) det).setThreshold(1));
+			} else
+			{
+				corrDet.setPvalThreshold(1);
+			}
 
-		Set<ExperimentData> data = new HashSet<>();
-		cs.setCollectDataUsedForInference(true);
-		cs.setCausal(true);
-		cs.run(relations);
-		data.addAll(cs.getDataUsedForInference());
-		cs.setCausal(false);
-		cs.run(relations);
-		data.addAll(cs.getDataUsedForInference());
+			data = new HashSet<>();
+			pairs = new HashSet<>();
+			cs.setCollectDataUsedForInference(true);
+			cs.setCausal(true);
+			cs.run(relations);
 
-		FDRAdjuster adjuster = new FDRAdjuster(false);
-		adjuster.adjustPValueThresholdsOfDatas(data, fdrThr);
+			if (correlationBased) pairs.addAll(cs.getPairsUsedForInference());
+			else data.addAll(cs.getDataUsedForInference());
 
-		cs.setCollectDataUsedForInference(false);
-		cs.setCausal(true);
+			cs.setCausal(false);
+			cs.run(relations);
+
+			if (correlationBased) pairs.addAll(cs.getPairsUsedForInference());
+			else data.addAll(cs.getDataUsedForInference());
+
+			cs.setCollectDataUsedForInference(false);
+			cs.setCausal(true);
+		}
+
+		if (correlationBased)
+		{
+			FDRAdjusterForCorrelation fad = new FDRAdjusterForCorrelation(pairs, corrDet);
+			fad.adjustPValueThresholdsForFDR(fdrThresholdForCorrelation);
+		}
+		else
+		{
+			FDRAdjuster adjuster = new FDRAdjuster(false);
+			adjuster.adjustPValueThresholdsOfDatas(data, fdrThr);
+		}
+
 		return cs.run(relations);
 	}
 

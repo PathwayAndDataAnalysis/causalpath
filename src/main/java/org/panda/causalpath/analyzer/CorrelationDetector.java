@@ -77,7 +77,7 @@ public class CorrelationDetector implements TwoDataChangeDetector
 
 			Tuple corr = Correlation.pearson(v[0], v[1]);
 
-			if (pvalThreshold > 0)
+			if (pvalThreshold >= 0)
 			{
 				if (corr.p > pvalThreshold) return 0;
 			}

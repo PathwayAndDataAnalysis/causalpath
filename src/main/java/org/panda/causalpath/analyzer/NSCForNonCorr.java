@@ -10,10 +10,7 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -60,12 +57,36 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	 */
 	public void run(int iterations)
 	{
-		// Turn off missing site effect collector
-		cs.setCollectDataWithMissingEffect(false);
+		// Init counter
+		DownstreamCounter dc = new DownstreamCounter(cs);
+
+		// Get maximal counts without considering data values, but only presence of data
+		Set<String> ignore = dc.getGenesWithNoPotential(relations);
 
 		// Get current statistics
-		DownstreamCounter dc = new DownstreamCounter(cs);
 		Map<String, Integer>[] current = dc.run(relations);
+		relations.stream().map(r -> r.source).filter(gene -> !ignore.contains(gene) && !current[0].containsKey(gene))
+			.forEach(gene ->
+			{
+				current[0].put(gene, 0);
+				current[1].put(gene, 0);
+				current[2].put(gene, 0);
+			});
+
+		// Get max possible counts for each source gene
+		Map<String, Integer> maxPotential = dc.getGenesPotentialDownstreamMax(relations);
+
+		if (minimumPotentialTargetsToConsider > 1)
+		{
+			new HashSet<>(current[0].keySet()).stream().filter(gene ->
+				!maxPotential.containsKey(gene) || maxPotential.get(gene) < minimumPotentialTargetsToConsider)
+				.forEach(gene ->
+				{
+					current[0].remove(gene);
+					current[1].remove(gene);
+					current[2].remove(gene);
+				});
+		}
 
 		// Get a run with non-randomized data to find current size
 		Set<Relation> result = cs.run(relations);
@@ -97,6 +118,14 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 			{
 				for (String gene : run[j].keySet())
 				{
+					if (minimumPotentialTargetsToConsider > 1 &&
+						maxPotential.get(gene) < minimumPotentialTargetsToConsider)
+					{
+						continue;
+					}
+
+					assert !ignore.contains(gene);
+
 					if (!cnt[j].containsKey(gene)) cnt[j].put(gene, 0);
 					if (!current[j].containsKey(gene)) current[j].put(gene, 0);
 

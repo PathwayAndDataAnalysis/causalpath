@@ -1,6 +1,5 @@
 package org.panda.causalpath.analyzer;
 
-import org.panda.causalpath.data.DataType;
 import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.NumericData;
 import org.panda.utility.ArrayUtil;
@@ -8,7 +7,10 @@ import org.panda.utility.Tuple;
 import org.panda.utility.statistics.Correlation;
 import org.panda.utility.statistics.FDR;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Ozgun Babur
@@ -48,6 +50,9 @@ public class FDRAdjusterForCorrelation
 				}
 			}
 		}
+
+//		System.out.println("Correlation data uniformity:");
+//		UniformityChecker.plot(pvals.values().stream().collect(Collectors.toList()));
 
 		double pThr = FDR.getPValueThreshold(pvals, null, fdrForCorrelation);
 		System.out.println("Correlation p-value thr = " + pThr);

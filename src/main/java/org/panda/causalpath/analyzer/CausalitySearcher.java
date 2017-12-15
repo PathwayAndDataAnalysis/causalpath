@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 /**
  * This class matches the experiment data with the pathway relations, and detect potential causality.
  */
-public class CausalitySearcher
+public class CausalitySearcher implements Cloneable
 {
 	/**
 	 * If that is false, then we are interested in conflicting relations.
@@ -48,12 +48,12 @@ public class CausalitySearcher
 	/**
 	 * The set of data that is used during inference of causality.
 	 */
-	private Set<ExperimentData> dataUsedForInference;
+	private Map<Relation, Set<ExperimentData>> dataUsedForInference;
 
 	/**
 	 * Set of pairs of data that contributed to inference.
 	 */
-	private Set<Set<ExperimentData>> pairsUsedForInference;
+	private Map<Relation, Set<Set<ExperimentData>>> pairsUsedForInference;
 
 	/**
 	 * If true, then an expression relation has to have an Activity data at its source.
@@ -85,13 +85,32 @@ public class CausalitySearcher
 		setCausal(causal);
 		this.forceSiteMatching = true;
 		this.siteProximityThreshold = 0;
-		this.collectDataWithMissingEffect = false;
-		this.collectDataUsedForInference = false;
+		this.collectDataWithMissingEffect = true;
+		this.collectDataUsedForInference = true;
 		this.mandateActivityDataUpstreamOfExpression = false;
 		this.useStrongestProteomicsDataForActivity = false;
 
 		this.generalActivityChangeIndicators = new HashSet<>(Arrays.asList(
 			DataType.PROTEIN, DataType.PHOSPHOPROTEIN, DataType.ACTIVITY));
+	}
+
+	public CausalitySearcher copy()
+	{
+		try
+		{
+			CausalitySearcher cs = (CausalitySearcher) this.clone();
+			cs.pairsUsedForInference = null;
+			cs.dataUsedForInference = null;
+			cs.dataNeedsAnnotation = null;
+			cs.generalActivityChangeIndicators = new HashSet<>(generalActivityChangeIndicators);
+			cs.setCollectDataUsedForInference(false);
+			cs.setCollectDataWithMissingEffect(false);
+			return cs;
+		}
+		catch (CloneNotSupportedException e)
+		{
+			throw new RuntimeException(e);
+		}
 	}
 
 	/**
@@ -100,21 +119,46 @@ public class CausalitySearcher
 	 */
 	public Set<Relation> run(Set<Relation> relations)
 	{
+		// Initialize collections
+
 		if (collectDataWithMissingEffect)
 		{
-			dataNeedsAnnotation = new HashSet<>();
+			if (dataNeedsAnnotation == null) dataNeedsAnnotation = new HashSet<>();
+			else dataNeedsAnnotation.clear();
 		}
 		if (collectDataUsedForInference)
 		{
-			dataUsedForInference = new HashSet<>();
-			pairsUsedForInference = new HashSet<>();
+			if (dataUsedForInference == null)
+			{
+				dataUsedForInference = new HashMap<>();
+				pairsUsedForInference = new HashMap<>();
+			}
+			else
+			{
+				dataUsedForInference.clear();
+				pairsUsedForInference.clear();
+			}
 		}
 
+		// This is where magic happens
 		Set<Relation> results = relations.stream().filter(this::satisfiesCriteria).collect(Collectors.toSet());
 
+		// If a subset of the results is desired, trim it
 		if (graphFilter != null)
 		{
 			results = graphFilter.filter(results);
+
+			// remove unnecessary entries in the collected data
+			if (collectDataUsedForInference)
+			{
+				Set<Relation> removedRels = new HashSet<>(dataUsedForInference.keySet());
+				removedRels.removeAll(results);
+				removedRels.forEach(r ->
+				{
+					dataUsedForInference.remove(r);
+					pairsUsedForInference.remove(r);
+				});
+			}
 		}
 
 		return results;
@@ -138,6 +182,31 @@ public class CausalitySearcher
 			if (!sd.isEmpty())
 			{
 				return satisfiesCriteria(sd, relation, td);
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Checks if the relation has potential to explain/conflict with the associated data to source and targets, but
+	 * without evaluating data values or site effect.
+	 *
+	 * @param relation relation to check
+	 * @return true if the relation has considerable data at both sides
+	 */
+	public boolean hasConsiderableData(Relation relation)
+	{
+		// Get data of target gene this relation can explain the change
+		Set<ExperimentData> td = getExplainableTargetData(relation);
+
+		if (!td.isEmpty())
+		{
+			// Get data of the source gene that can be cause of this relation
+			Set<ExperimentData> sd = getAffectingSourceData(relation);
+
+			if (!sd.isEmpty())
+			{
+				return true;
 			}
 		}
 		return false;
@@ -182,9 +251,15 @@ public class CausalitySearcher
 		{
 			if (collectDataUsedForInference)
 			{
-				dataUsedForInference.add(sourceData);
-				dataUsedForInference.add(targetData);
-				pairsUsedForInference.add(new HashSet<>(Arrays.asList(sourceData, targetData)));
+				if (!dataUsedForInference.containsKey(rel))
+				{
+					dataUsedForInference.put(rel, new HashSet<>());
+					pairsUsedForInference.put(rel, new HashSet<>());
+				}
+
+				dataUsedForInference.get(rel).add(sourceData);
+				dataUsedForInference.get(rel).add(targetData);
+				pairsUsedForInference.get(rel).add(new HashSet<>(Arrays.asList(sourceData, targetData)));
 			}
 			return true;
 		}
@@ -352,12 +427,17 @@ public class CausalitySearcher
 
 	public Set<ExperimentData> getDataUsedForInference()
 	{
-		return dataUsedForInference;
+		return dataUsedForInference.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
 	}
 
 	public Set<Set<ExperimentData>> getPairsUsedForInference()
 	{
-		return pairsUsedForInference;
+		return pairsUsedForInference.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
+	}
+
+	public Map<Relation, Set<ExperimentData>> getInferenceUnits()
+	{
+		return dataUsedForInference;
 	}
 
 	public void setCollectDataUsedForInference(boolean collect)

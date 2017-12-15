@@ -146,9 +146,20 @@ public class GeneWithData
 	 * Tells if this gene is associated with a changed prooteomics or phosphoproteomics data.
 	 * @return true if there is any
 	 */
-	public boolean hasChangedProteinData()
+	public boolean hasChangedProteomicData()
 	{
 		return !getChangedData(DataType.PROTEIN).keySet().isEmpty() ||
 			!getChangedData(DataType.PHOSPHOPROTEIN).keySet().isEmpty();
+	}
+
+	/**
+	 * Gets the set of chnaged proteomic data
+	 * @return proteomic data with a significant change
+	 */
+	public Set<ExperimentData> getChangedProteomicData()
+	{
+		Set<ExperimentData> set = new HashSet<>(getChangedData(DataType.PROTEIN).keySet());
+		set.addAll(getChangedData(DataType.PHOSPHOPROTEIN).keySet());
+		return set;
 	}
 }

@@ -37,6 +37,8 @@ public abstract class NetworkSignificanceCalculator
 	 */
 	protected double significanceThreshold;
 
+	protected int minimumPotentialTargetsToConsider;
+
 	/**
 	 * Constructor with the network.
 	 */
@@ -44,6 +46,12 @@ public abstract class NetworkSignificanceCalculator
 	{
 		this.relations = relations;
 		this.cs = cs;
+		this.minimumPotentialTargetsToConsider = 0;
+	}
+
+	public void setMinimumPotentialTargetsToConsider(int minimumPotentialTargetsToConsider)
+	{
+		this.minimumPotentialTargetsToConsider = minimumPotentialTargetsToConsider;
 	}
 
 	public void setPvalThreshold(double significanceThreshold)

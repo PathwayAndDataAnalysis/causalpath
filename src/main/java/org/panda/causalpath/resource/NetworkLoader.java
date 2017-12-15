@@ -79,10 +79,6 @@ public class NetworkLoader
 			addGraph(allGraphs, SignedType.DOWNREGULATES_EXPRESSION, TFactS.get().getNegativeGraph());
 		}
 
-		// temporary code
-		allGraphs.remove(SignedType.INHIBITS_GTPASE);
-		allGraphs.remove(SignedType.ACTIVATES_GTPASE);
-
 		// Generate relations based on the network
 
 		for (SignedType signedType : allGraphs.keySet())
@@ -105,6 +101,8 @@ public class NetworkLoader
 						case DEPHOSPHORYLATES: type = RelationType.DEPHOSPHORYLATES; break;
 						case UPREGULATES_EXPRESSION: type = RelationType.UPREGULATES_EXPRESSION; break;
 						case DOWNREGULATES_EXPRESSION: type = RelationType.DOWNREGULATES_EXPRESSION; break;
+						case ACTIVATES_GTPASE: type = RelationType.ACTIVATES_GTPASE; break;
+						case INHIBITS_GTPASE: type = RelationType.INHIBITS_GTPASE; break;
 						default: throw new RuntimeException("Is there a new type??");
 					}
 					Relation rel = new Relation(source, target, type, graph.getMediatorsInString(source, target));
@@ -185,14 +183,17 @@ public class NetworkLoader
 			for (String res : s.split(",|;|\\s+|\\|"))
 			{
 				res = res.trim();
-				try
+
+				if (!res.isEmpty())
 				{
-					ResourceType type = valueOf(res);
-					set.add(type);
-				}
-				catch (IllegalArgumentException e)
-				{
-					throw new RuntimeException("Network resource not recognized: " + res);
+					try
+					{
+						ResourceType type = valueOf(res);
+						set.add(type);
+					} catch (IllegalArgumentException e)
+					{
+						throw new RuntimeException("Network resource not recognized: " + res);
+					}
 				}
 			}
 			return set;

@@ -2,8 +2,10 @@ package org.panda.causalpath.analyzer;
 
 import org.panda.causalpath.data.DataType;
 import org.panda.causalpath.data.ExperimentData;
+import org.panda.causalpath.data.ProteinData;
 import org.panda.causalpath.network.Relation;
 import org.panda.utility.statistics.FDR;
+import org.panda.utility.statistics.UniformityChecker;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,6 +27,12 @@ public class FDRAdjuster
 		this.poolProteomics = poolProteomics;
 	}
 
+	/**
+	 * Collects all the data associated with the given relations and sets their p-value threshold to control false
+	 * discovery rate at the given level.
+	 * @param relations relations in the analysis
+	 * @param fdrMap desired FDR threshold for each data type
+	 */
 	public void adjustPValueThresholdsForRelations(Set<Relation> relations, Map<DataType, Double> fdrMap)
 	{
 		adjustPValueThresholdsOfDatas(relations.stream().map(Relation::getAllData).flatMap(Collection::stream)
@@ -70,10 +78,10 @@ public class FDRAdjuster
 			});
 			double pThr = FDR.getPValueThreshold(pvalues, null, fdrMap.get(type));
 
-//			if (clz == ProteinData.class)
+//			if (type == DataType.PROTEIN || type == DataType.PHOSPHOPROTEIN)
 //			{
-//				UniformityChecker.plot(new ArrayList<>(pvalues.values()));
-//				System.exit(0);
+//				System.out.println(type + " data uniformity:");
+//				UniformityChecker.plot(pvalues.values().stream().collect(Collectors.toList()));
 //			}
 
 			System.out.println("type = " + type + "\tpThr = " + pThr);

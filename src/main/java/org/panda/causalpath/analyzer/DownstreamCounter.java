@@ -70,4 +70,26 @@ public class DownstreamCounter
 	{
 		return map.keySet().stream().collect(Collectors.toMap(s -> s, s -> map.get(s).size()));
 	}
+
+	public Map<String, Integer> getGenesPotentialDownstreamMax(Set<Relation> relations)
+	{
+		Map<String, Set<String>> map = new HashMap<>();
+		relations.stream().filter(cs::hasConsiderableData).forEach(r ->
+		{
+			if (!map.containsKey(r.source)) map.put(r.source, new HashSet<>());
+			map.get(r.source).add(r.target);
+		});
+
+		return convertToCounts(map);
+	}
+
+	public Set<String> getGenesWithNoPotential(Set<Relation> relations)
+	{
+		Set<String> consider = relations.stream().filter(cs::hasConsiderableData).map(r -> r.source)
+			.collect(Collectors.toSet());
+
+		return relations.stream().map(r -> r.source).filter(gene -> !consider.contains(gene))
+			.collect(Collectors.toSet());
+	}
+
 }

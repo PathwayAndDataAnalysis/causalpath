@@ -282,7 +282,7 @@ public class GraphWriter
 				if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(gene))
 				{
 					FileUtil.writeln("node\t" + gene + "\tcolor\t" + colS, writer2);
-					FileUtil.writeln("node\t" + gene + "\ttooltip\t" + siteID, writer2);
+					FileUtil.writeln("node\t" + gene + "\ttooltip\t" + siteID + ", " + val, writer2);
 					totalProtUsedUp.add(gene);
 				}
 				else
@@ -320,24 +320,53 @@ public class GraphWriter
 	/**
 	 * Generates a causality graph where each node is a measurement. In this graph, pathway relations can be displayed
 	 * more than once if the same relation can explain more than one data pairs.
+	 *
+	 * @param filename name of the output sif file
+	 * @param unitsMap The map from the inferred relations to the data that helped the inference.
 	 */
-	public void writeSIFDataCentric(String filename) throws IOException
+	public void writeSIFDataCentric(String filename, Map<Relation, Set<ExperimentData>> unitsMap) throws IOException
 	{
 		if (!filename.endsWith(".sif")) filename += ".sif";
 
+		Set<ExperimentData> used = new HashSet<>();
+
 		// write relations
 		BufferedWriter writer1 = new BufferedWriter(new FileWriter(filename));
-		relations.forEach(r -> FileUtil.writeln(r.source + "\t" + r.type.name + "\t" + r.target + "\t" +
-			r.getMediators(), writer1));
-		writer1.close();
+		unitsMap.keySet().forEach(r ->
+		{
+			Set<ExperimentData> datas = unitsMap.get(r);
+			Set<ExperimentData> sources = r.sourceData.getData().stream().filter(datas::contains)
+				.collect(Collectors.toSet());
+			Set<ExperimentData> targets = r.targetData.getData().stream().filter(datas::contains)
+				.collect(Collectors.toSet());
+
+			for (ExperimentData source : sources)
+			{
+				for (ExperimentData target : targets)
+				{
+					FileUtil.writeln(source.getId() + "\t" + r.type.name + "\t" + target.getId(), writer1);
+					used.add(source);
+					used.add(target);
+				}
+			}
+		});
 
 		filename = filename.substring(0, filename.lastIndexOf(".")) + ".format";
 		BufferedWriter writer2 = new BufferedWriter(new FileWriter(filename));
 		writer2.write("node\tall-nodes\tcolor\t255 255 255\n");
-		relations.stream().map(r -> new GeneWithData[]{r.sourceData, r.targetData}).flatMap(Arrays::stream).distinct()
-			.map(g -> g.getChangedData().keySet()).flatMap(Collection::stream).forEach(data ->
-				FileUtil.writeln("node\t" + data.id + "\tcolor\t" + vtc.getColorInString(data.getChangeValue()),
-					writer2));
+		used.stream().forEach(data ->
+		{
+			if (data.hasChangeDetector())
+			{
+				FileUtil.writeln("node\t" + data.getId() + "\tcolor\t" + vtc.getColorInString(data.getChangeValue()),
+					writer2);
+			}
+			if (data.getType() == DataType.PHOSPHOPROTEIN && data.getEffect() != 0)
+			{
+				FileUtil.writeln("node\t" + data.getId() + "\tbordercolor\t" +
+					inString(data.getEffect() == -1 ? inhibitingBorderColor : activatingBorderColor), writer2);
+			}
+		});
 
 		writer2.close();
 	}
@@ -507,22 +536,6 @@ public class GraphWriter
 		}
 
 		return datas;
-
-//		Set<ExperimentData> dataInGraph = relations.stream().map(r -> new ExperimentData[]{r.source, r.target})
-//			.flatMap(Arrays::stream).collect(Collectors.toSet());
-//
-//		Set<String> symInGraph = relations.stream().map(r -> new String[]{r.source, r.target})
-//			.flatMap(Arrays::stream).collect(Collectors.toSet());
-//
-//		Set<ExperimentData> otherData = Stream.concat(
-//			relations.stream().map(r -> r.sourceData.getChangedData().keySet()).flatMap(Collection::stream),
-//			relations.stream().map(r -> r.targetData.getChangedData().keySet()).flatMap(Collection::stream)).distinct()
-//			.filter(d -> (d instanceof ExpressionData || d instanceof CNAData) && !dataInGraph.contains(d))
-//			.filter(d -> symInGraph.contains(d.getGeneSymbols().iterator().next()))
-//			.collect(Collectors.toSet());
-//
-//		dataInGraph.addAll(otherData);
-//		return dataInGraph;
 	}
 
 	private Set<String> getGenesInGraph()
