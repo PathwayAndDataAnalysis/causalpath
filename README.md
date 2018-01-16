@@ -22,4 +22,4 @@ The input directory has to contain a `parameters.txt` file which provides the ne
 
 After CausalPath runs on your input data, it generates output in the same input directory where the `parameters.txt` is. Among those output files, `causal.sif` and `causal.format` are two files that ChiBE needs for displaying the result graph. To display, please open ChiBE and from the menu, do `SIF -> Load SIF File`. Navigate to the directory and select `causal.sif`. 
 
-A manuscript for this method is under review.
+A manuscript for this method is under preparation. Additionally, another manuscript that use CausalPath to explore platelet activation pathways is under review.
