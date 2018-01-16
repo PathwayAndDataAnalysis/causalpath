@@ -1,5 +1,8 @@
 package org.panda.causalpath.data;
 
+import java.util.Set;
+import java.util.stream.IntStream;
+
 /**
  * Holds an array of categorical data points.
  */
@@ -10,6 +13,11 @@ public abstract class CategoricalData extends ExperimentData
 	public CategoricalData(String id, String symbol)
 	{
 		super(id, symbol);
+	}
+
+	public CategoricalData(String id, Set<String> symbols)
+	{
+		super(id, symbols);
 	}
 
 	/**
@@ -26,5 +34,18 @@ public abstract class CategoricalData extends ExperimentData
 		}
 
 		return c;
+	}
+
+	public int getNumberOfCategories()
+	{
+		return (int) IntStream.of(getCategories()).distinct().count();
+	}
+
+	/**
+	 * Method getting the category array as parameter for efficiency purposes.
+	 */
+	public int getNumberOfCategories(int[] cat)
+	{
+		return (int) IntStream.of(cat).distinct().count();
 	}
 }

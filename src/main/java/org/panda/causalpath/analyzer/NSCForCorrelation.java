@@ -87,6 +87,8 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 
 		for (int i = 0; i < iterations; i++)
 		{
+			System.gc();
+
 			// Shuffle data labels and count downstream of each gene
 			dls.shuffle();
 			Map<String, Integer> run = dc.run(rels)[0];
@@ -135,8 +137,20 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 
 		for (String gene : current.keySet())
 		{
-			pvals.put(gene, current.get(gene) == 0 ? 1 : !cnt.containsKey(gene) ? 0 :
-				cnt.get(gene) / (double) iterations);
+			double pval;
+
+			if (current.get(gene) == 0)
+			{
+				pval = 1;
+			}
+			else
+			{
+				int c = !cnt.containsKey(gene) ? 0 : cnt.get(gene);
+				if (c == 0) c++; // pval = 0 is non-realistic. bring it to the smallest nonzero value
+				pval = c / (double) iterations;
+			}
+
+			pvals.put(gene, pval);
 		}
 	}
 

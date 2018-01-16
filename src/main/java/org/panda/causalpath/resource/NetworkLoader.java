@@ -208,6 +208,21 @@ public class NetworkLoader
 			}
 			return sb.toString();
 		}
+
+		public static Map getValuesAsJson()
+		{
+			List list = new ArrayList<>();
+			for (ResourceType type : values())
+			{
+				list.add(type.toString());
+			}
+
+			Map map = new LinkedHashMap<>();
+			map.put("name", "ResourceType");
+			map.put("values", list);
+			return map;
+		}
+
 	}
 
 

@@ -111,6 +111,9 @@ public class MergeResultsIntoSeriesView
 					formatList.add(allSites.get(key));
 				}
 			}
+
+			// order sites for consistency across frames
+			Collections.sort(formatList);
 		}
 
 		List<Set<String>> borderColorSetNodesList = new ArrayList<>();

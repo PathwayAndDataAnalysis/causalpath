@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
  */
 public class DataLabelShufflerForCorrelation extends DataLabelShuffler
 {
+	private static final boolean USE_CACHE = false;
+
 	Map<Object, Map<Object, Integer>> correlationMap;
 
 	public DataLabelShufflerForCorrelation(Set<Relation> relations)

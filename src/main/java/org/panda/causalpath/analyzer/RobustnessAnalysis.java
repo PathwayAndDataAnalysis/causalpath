@@ -84,7 +84,7 @@ public class RobustnessAnalysis
 		writer.close();
 	}
 
-	private Set<Relation> getARun(Set<Relation> relations)
+	private Set<Relation> getARun(Set<Relation> relations) throws IOException
 	{
 		if (data == null && pairs == null)
 		{
@@ -119,12 +119,12 @@ public class RobustnessAnalysis
 
 		if (correlationBased)
 		{
-			FDRAdjusterForCorrelation fad = new FDRAdjusterForCorrelation(pairs, corrDet);
+			FDRAdjusterForCorrelation fad = new FDRAdjusterForCorrelation(null, pairs, corrDet);
 			fad.adjustPValueThresholdsForFDR(fdrThresholdForCorrelation);
 		}
 		else
 		{
-			FDRAdjuster adjuster = new FDRAdjuster(false);
+			FDRAdjuster adjuster = new FDRAdjuster(null, false);
 			adjuster.adjustPValueThresholdsOfDatas(data, fdrThr);
 		}
 

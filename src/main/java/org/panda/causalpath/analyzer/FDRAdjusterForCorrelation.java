@@ -4,13 +4,14 @@ import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.NumericData;
 import org.panda.utility.ArrayUtil;
 import org.panda.utility.Tuple;
-import org.panda.utility.statistics.Correlation;
-import org.panda.utility.statistics.FDR;
+import org.panda.utility.statistics.*;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author Ozgun Babur
@@ -21,43 +22,72 @@ public class FDRAdjusterForCorrelation
 
 	CorrelationDetector cd;
 
-	public FDRAdjusterForCorrelation(Set<Set<ExperimentData>> pairs, CorrelationDetector cd)
+	String directory;
+
+	public FDRAdjusterForCorrelation(String directory, Set<Set<ExperimentData>> pairs, CorrelationDetector cd)
 	{
+		this.directory = directory;
 		this.pairs = pairs;
 		this.cd = cd;
 	}
 
-	public void adjustPValueThresholdsForFDR(double fdrForCorrelation)
+	public void adjustPValueThresholdsForFDR(double fdrForCorrelation) throws IOException
 	{
 		Map<String, Double> pvals = new HashMap<>();
 
 		for (Set<ExperimentData> pair : pairs)
 		{
-			if (allNumeric(pair))
-			{
-				Iterator<ExperimentData> iter = pair.iterator();
-				NumericData nd1 = (NumericData) iter.next();
-				NumericData nd2 = (NumericData) iter.next();
+			Iterator<ExperimentData> iter = pair.iterator();
+			ExperimentData data1 = iter.next();
+			ExperimentData data2 = iter.next();
 
-				double[][] v = ArrayUtil.trimNaNs(nd1.vals, nd2.vals);
-				if (v[0].length >= cd.minimumSampleSize)
-				{
-					Tuple cor = Correlation.pearson(v[0], v[1]);
-					if (!Double.isNaN(cor.p))
-					{
-						pvals.put(getID(pair), cor.p);
-					}
-				}
+			Tuple corr = cd.calcCorrelation(data1, data2);
+			if (!corr.isNaN())
+			{
+				pvals.put(getID(pair), corr.p);
 			}
 		}
 
-//		System.out.println("Correlation data uniformity:");
-//		UniformityChecker.plot(pvals.values().stream().collect(Collectors.toList()));
+		if (directory != null)
+		{
+			BufferedWriter writer = Files.newBufferedWriter(Paths.get(directory + "/pval-uniformity.txt"));
+			UniformityChecker.plot(pvals.values().stream().collect(Collectors.toList()), writer);
+			writer.close();
+		}
 
 		double pThr = FDR.getPValueThreshold(pvals, null, fdrForCorrelation);
 		System.out.println("Correlation p-value thr = " + pThr);
 
 		cd.setPvalThreshold(pThr);
+
+		// debug code for plotting G-test vs t-test 2D histogram----------------
+//		Histogram2D h = new Histogram2D(0.005);
+//		Histogram hc = new Histogram(0.005);
+//		List<Double> list1 = new ArrayList<>();
+//		List<Double> list2 = new ArrayList<>();
+//		for (Set<ExperimentData> pair : pairs)
+//		{
+//			Iterator<ExperimentData> iter = pair.iterator();
+//			ExperimentData data1 = iter.next();
+//			ExperimentData data2 = iter.next();
+//
+//			Tuple cN = cd.calcCorrelationNaive(data1, data2);
+//			Tuple cM = cd.calcCorrelationWithMissingData(data1, data2);
+//			if (!cN.isNaN() && !cM.isNaN())// &&
+////				cN.p < 0.1 && cM.p < 0.1)
+//			{
+//				h.count(cN.p, cM.p);
+//				list1.add(cN.p);
+//				list2.add(cM.p);
+//				hc.count(cM.v);
+//			}
+//		}
+//		System.out.println("Pearson correlation " +
+//			Correlation.pearson(ArrayUtil.toArray(list1), ArrayUtil.toArray(list2)));
+//		System.out.println("Correlation histogram");
+//		hc.print();
+//		h.plot();
+		// end of debug-----------------------------------------------------------------
 	}
 
 	private String getID(Set<ExperimentData> pair)

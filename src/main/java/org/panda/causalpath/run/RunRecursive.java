@@ -12,12 +12,12 @@ import java.nio.file.Paths;
  */
 public class RunRecursive
 {
-	public static void main(String[] args) throws IOException
+	public static void main(String[] args) throws IOException, ClassNotFoundException
 	{
 		run(args[0]);
 	}
 
-	private static void run(String dir) throws IOException
+	private static void run(String dir) throws IOException, ClassNotFoundException
 	{
 		if (Files.isDirectory(Paths.get(dir)))
 		{
@@ -25,6 +25,7 @@ public class RunRecursive
 //				&&
 //				!Files.exists(Paths.get(dir + File.separator + CausalPath.CAUSATIVE_RESULT_FILE_PREFIX + ".sif")))
 			{
+				System.gc();
 				CausalPath.main(new String[]{dir});
 			}
 			else

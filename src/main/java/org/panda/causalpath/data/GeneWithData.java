@@ -127,9 +127,18 @@ public class GeneWithData
 	 * @param type desired data type
 	 * @return associated data of the given type
 	 */
-	public Set<ExperimentData> getData(DataType type)
+	public Set<ExperimentData> getData(DataType... type)
 	{
-		if (dataMap.containsKey(type)) return dataMap.get(type);
+		if (type.length == 1 && dataMap.containsKey(type[0])) return dataMap.get(type[0]);
+		else if (type.length > 1)
+		{
+			Set<ExperimentData> set = new HashSet<>();
+			for (DataType dataType : type)
+			{
+				if (dataMap.containsKey(dataType)) set.addAll(dataMap.get(dataType));
+			}
+			return set;
+		}
 		return Collections.emptySet();
 	}
 

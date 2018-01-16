@@ -5,8 +5,11 @@ import org.panda.causalpath.analyzer.OneDataChangeDetector;
 import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.Relation;
 import org.panda.resource.tcga.ProteomicsFileRow;
+import org.panda.utility.ArrayUtil;
+import org.panda.utility.statistics.Histogram;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Coverts the RPPAData in resource project to appropriate objects for this project and serves them.
@@ -106,6 +109,62 @@ public class ProteomicsLoader
 	public void associateChangeDetector(OneDataChangeDetector chDet, DataSelector selector)
 	{
 		datas.stream().filter(selector::select).forEach(d -> d.setChDet(chDet));
+	}
+
+	public void initMissingDataForProteins()
+	{
+		Optional<ProteinData> opt = datas.stream().filter(d -> d instanceof ProteinData)
+			.map(d -> (ProteinData) d).findAny();
+
+		if (!opt.isPresent()) return;
+
+		int size = opt.get().vals.length;
+
+//		int[] totalProtCnt = new int[size];
+//		int[] phospProtCnt = new int[size];
+
+		boolean[] hasTotalProt = new boolean[size];
+		boolean[] hasPhospProt = new boolean[size];
+
+		Arrays.fill(hasTotalProt, false);
+		Arrays.fill(hasPhospProt, false);
+
+		datas.stream().filter(d -> d instanceof ProteinData).map(d -> (ProteinData) d).forEach(d ->
+		{
+			if (d.getType() == DataType.PROTEIN)
+			{
+				for (int i = 0; i < size; i++)
+				{
+					if (!Double.isNaN(d.vals[i]))
+					{
+						hasTotalProt[i] = true;
+//						totalProtCnt[i]++;
+					}
+				}
+			}
+			else if (d.getType() == DataType.PHOSPHOPROTEIN)
+			{
+				for (int i = 0; i < size; i++)
+				{
+					if (!Double.isNaN(d.vals[i]))
+					{
+						hasPhospProt[i] = true;
+//						phospProtCnt[i]++;
+					}
+				}
+			}
+		});
+
+		datas.stream().filter(d -> d instanceof ProteinData).map(d -> (ProteinData) d)
+			.forEach(d -> d.initPresenceData(d.getType() == DataType.PHOSPHOPROTEIN ? hasPhospProt : hasTotalProt));
+
+//		System.out.println("Total protein counts");
+//		Histogram h = new Histogram(100, ArrayUtil.toDouble(totalProtCnt));
+//		h.print();
+//
+//		System.out.println("\nPhosphoprotein counts");
+//		h = new Histogram(100, ArrayUtil.toDouble(phospProtCnt));
+//		h.print();
 	}
 
 	/**

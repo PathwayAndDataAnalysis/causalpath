@@ -1,7 +1,6 @@
 package org.panda.causalpath.network;
 
-import java.util.Arrays;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -53,26 +52,57 @@ public class GraphFilter
 
 	/**
 	 * Trims the network either to specific relation types or to the neighborhood of specific genes or both.
-	 * @param results the network
+	 * @param relations the network
 	 * @return trimmed network
 	 */
-	public Set<Relation> filter(Set<Relation> results)
+	public Set<Relation> preAnalysisFilter(Set<Relation> relations)
 	{
 		// Trim with relation type
 
 		switch (relationFilterType)
 		{
 			case NO_FILTER:
+			case PHOSPHO_PRIMARY_EXPRESSION_SECONDARY:
 				break;
-			case PHOSPHO_ONLY: results = results.stream().filter(r -> r.type.affectsPhosphoSite).collect(Collectors.toSet());
+			case PHOSPHO_ONLY: relations = relations.stream().filter(r -> r.type.affectsPhosphoSite).collect(Collectors.toSet());
 				break;
-			case EXPRESSION_ONLY: results = results.stream()
+			case EXPRESSION_ONLY: relations = relations.stream()
 				.filter(r -> r.type.affectsTotalProt).collect(Collectors.toSet());
+				break;
+			default: throw new RuntimeException("Unhandled relation filter type: " + relationFilterType);
+		}
+
+		// Trim with focus genes
+
+		if (focusGenes != null && !focusGenes.isEmpty())
+		{
+			relations = relations.stream().filter(r ->
+				focusGenes.contains(r.source) ||
+				focusGenes.contains(r.target)).collect(Collectors.toSet());
+		}
+
+		return relations;
+	}
+
+	/**
+	 * Trims the network either to specific relation types or to the neighborhood of specific genes or both.
+	 * @param relations the network
+	 * @return trimmed network
+	 */
+	public Set<Relation> postAnalysisFilter(Set<Relation> relations)
+	{
+		// Trim with relation type
+
+		switch (relationFilterType)
+		{
+			case NO_FILTER:
+			case PHOSPHO_ONLY:
+			case EXPRESSION_ONLY:
 				break;
 			case PHOSPHO_PRIMARY_EXPRESSION_SECONDARY:
 			{
-				Set<String> genes = getGenesInPhoshoGraph(results);
-				results = results.stream().filter(r -> r.type.affectsPhosphoSite ||
+				Set<String> genes = getGenesInPhoshoGraph(relations);
+				relations = relations.stream().filter(r -> r.type.affectsPhosphoSite ||
 					genes.contains(r.source) ||
 					genes.contains(r.target))
 					.collect(Collectors.toSet());
@@ -81,16 +111,7 @@ public class GraphFilter
 			default: throw new RuntimeException("Unhandled relation filter type: " + relationFilterType);
 		}
 
-		// Trim with focus genes
-
-		if (focusGenes != null && !focusGenes.isEmpty())
-		{
-			results = results.stream().filter(r ->
-				focusGenes.contains(r.source) ||
-				focusGenes.contains(r.target)).collect(Collectors.toSet());
-		}
-
-		return results;
+		return relations;
 	}
 
 	public void setRelationFilterType(RelationFilterType relationFilterType)
@@ -153,6 +174,20 @@ public class GraphFilter
 				sb.append("\t").append(type.getName()).append(": ").append(type.description).append("\n");
 			}
 			return sb.toString();
+		}
+
+		public static Map getValuesAsJson()
+		{
+			List list = new ArrayList<>();
+			for (RelationFilterType type : values())
+			{
+				list.add(type.getName());
+			}
+
+			Map map = new LinkedHashMap<>();
+			map.put("name", "RelationFilterType");
+			map.put("values", list);
+			return map;
 		}
 	}
 }

@@ -60,7 +60,7 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 		// Init counter
 		DownstreamCounter dc = new DownstreamCounter(cs);
 
-		// Get maximal counts without considering data values, but only presence of data
+		// Get the genes with no sufficient data or their downstream have no such data even to be considered
 		Set<String> ignore = dc.getGenesWithNoPotential(relations);
 
 		// Get current statistics
@@ -85,6 +85,7 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 					current[0].remove(gene);
 					current[1].remove(gene);
 					current[2].remove(gene);
+					ignore.add(gene);
 				});
 		}
 
@@ -118,16 +119,13 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 			{
 				for (String gene : run[j].keySet())
 				{
-					if (minimumPotentialTargetsToConsider > 1 &&
-						maxPotential.get(gene) < minimumPotentialTargetsToConsider)
+					if (ignore.contains(gene))
 					{
 						continue;
 					}
 
-					assert !ignore.contains(gene);
-
 					if (!cnt[j].containsKey(gene)) cnt[j].put(gene, 0);
-					if (!current[j].containsKey(gene)) current[j].put(gene, 0);
+//					if (!current[j].containsKey(gene)) current[j].put(gene, 0);
 
 					if (run[j].get(gene) >= current[j].get(gene)) cnt[j].put(gene, cnt[j].get(gene) + 1);
 				}
@@ -153,8 +151,20 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 
 			for (String gene : current[i].keySet())
 			{
-				pvalMaps[i].put(gene, current[i].get(gene) == 0 ? 1 : !cnt[i].containsKey(gene) ? 0 :
-					cnt[i].get(gene) / (double) iterations);
+				double pval;
+
+				if (current[i].get(gene) == 0)
+				{
+					pval = 1;
+				}
+				else
+				{
+					int c = !cnt[i].containsKey(gene) ? 0 : cnt[i].get(gene);
+					if (c == 0) c++; // we don't want 0 as a p-value because they will always pass multiple hypothesis correction
+					pval = c / (double) iterations;
+				}
+
+				pvalMaps[i].put(gene, pval);
 			}
 		}
 	}

@@ -146,7 +146,7 @@ public class CausalitySearcher implements Cloneable
 		// If a subset of the results is desired, trim it
 		if (graphFilter != null)
 		{
-			results = graphFilter.filter(results);
+			results = graphFilter.postAnalysisFilter(results);
 
 			// remove unnecessary entries in the collected data
 			if (collectDataUsedForInference)
