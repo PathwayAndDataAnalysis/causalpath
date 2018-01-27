@@ -116,6 +116,9 @@ public class ProteomicsFileReader
 			List<String> header = Arrays.asList(sc.nextLine().split("\t"));
 
 			int idInd = header.indexOf(idName);
+
+			if (idInd < 0) throw new RuntimeException("Cannot find \"" + idName + "\" column in values file.");
+
 			int[] valInd = new int[colname.length];
 			for (int i = 0; i < colname.length; i++)
 			{

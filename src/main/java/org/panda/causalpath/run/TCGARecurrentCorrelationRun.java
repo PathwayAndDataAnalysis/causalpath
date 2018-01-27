@@ -48,7 +48,7 @@ public class TCGARecurrentCorrelationRun
 				TCGALoader loader = new TCGALoader(dir.getPath());
 				loader.decorateRelations(rels);
 
-				CorrelationDetector det = new CorrelationDetector(0.01, 0.01);
+				CorrelationDetector det = new CorrelationDetector(-1, 0.01);
 				for (Relation rel : rels)
 				{
 					if (!rel.sourceData.isEmpty() && !rel.targetData.isEmpty())

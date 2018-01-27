@@ -101,7 +101,7 @@ public class CausalPath
 	 * Whether or not to do a log transformation on the values read, before every other kinds of processing. Log base
 	 * is 2.
 	 */
-	private boolean doLogTransfrorm;
+	private boolean doLogTransfrorm = false;
 
 	/**
 	 * A threshold to determine significant changes whenever it applies. This can be a value threshold, or a p-value
@@ -115,6 +115,11 @@ public class CausalPath
 	private Map<DataType, Double> fdrThresholdForDataSignificance;
 
 	/**
+	 * Set of standard deviation thresholds to apply to the data.
+	 */
+	private Map<DataType, Double> stDevThresholds;
+
+	/**
 	 * Whether we should pool proteomics and phosphoproteomics during FDR adjustment. Pooling makes sense for RPPA data
 	 * because they are coming from single experiment.
 	 */
@@ -123,7 +128,7 @@ public class CausalPath
 	/**
 	 * A threshold to determine if the network size or a downstream of a protein is significantly crowded.
 	 */
-	private double fdrThresholdForNetworkSignificance;
+	private double fdrThresholdForNetworkSignificance = 0.1;
 
 	/**
 	 * A correlation threshold when the value transformation is correlation. This is optional, but if not used, then
@@ -136,12 +141,12 @@ public class CausalPath
 	/**
 	 * A correlation FDR threshold when the value transformation is correlation. When this is used,
 	 */
-	private double fdrThresholdForCorrelation;
+	private double fdrThresholdForCorrelation = 0.1;
 
 	/**
 	 * Proximity threshold to infer effects of unknown sites by the known effect of neighbor sites.
 	 */
-	private int siteEffectProximityThreshold;
+	private int siteEffectProximityThreshold = 0;
 
 	/**
 	 * A method for interpretation of values in the data file.
@@ -151,18 +156,18 @@ public class CausalPath
 	/**
 	 * A default value for the missing values in the data file.
 	 */
-	private double defaultMissingValue;
+	private Double defaultMissingValue = null;
 
 	/**
 	 * Parameter for calculating network significances. If this is true, then <code>permutationCount</code> should also
 	 * be set.
 	 */
-	private boolean calculateNetworkSignificance;
+	private boolean calculateNetworkSignificance = false;
 
 	/**
 	 * Number of iterations of permutations to use during network significance calculations.
 	 */
-	private int permutationCount;
+	private int permutationCount = 1000;
 
 	private String tcgaDirectory;
 
@@ -196,13 +201,15 @@ public class CausalPath
 
 	private String tfActivityFile;
 
-	private boolean showUnexplainedProteomicData = false;
+	private boolean showAllGenesWithProteomicData = false;
+
+	private boolean hideDataNotPartOfCausalRelations = false;
 
 	private boolean useNetworkSignificanceForCausalReasoning = false;
 
-	private int minimumPotentialTargetsToConsiderForDownstreamSignificance = 1;
+	private int minimumPotentialTargetsToConsiderForDownstreamSignificance = 5;
 
-	private boolean showInsignificantProteinData = false;
+	private boolean showInsignificantData = false;
 
 	private boolean testMissingValues = false;
 
@@ -316,8 +323,9 @@ public class CausalPath
 		SiteEffectCollective sec = new SiteEffectCollective();
 		sec.fillInMissingEffect(rows, siteEffectProximityThreshold);
 
-		ProteomicsLoader loader = new ProteomicsLoader(rows);
+		ProteomicsLoader loader = new ProteomicsLoader(rows, stDevThresholds);
 		if (testMissingValues) loader.initMissingDataForProteins();
+//		loader.printStDevHistograms();
 
 		// Load signed relations
 		Set<Relation> relations = networkSelection == null ? NetworkLoader.load() :
@@ -418,6 +426,8 @@ public class CausalPath
 			causal = cs.run(relations);
 		}
 
+//		loader.printStDevHistograms(cs.getDataUsedForInference());
+
 		// Significance calculation
 		NetworkSignificanceCalculator nsc = calculateNetworkSignificance(relations, useCorrelation, cs.copy());
 
@@ -438,32 +448,25 @@ public class CausalPath
 		GraphWriter writer = new GraphWriter(causal, nsc);
 		writer.setUseGeneBGForTotalProtein(!useCorrelation);
 		writer.setColorSaturationValue(colorSaturationValue);
+		writer.setShowInsignificantData(showInsignificantData);
 
-		if (!useCorrelation && !showInsignificantProteinData)
-		{
-			Set<ExperimentData> set = new HashSet<>(cs.getDataUsedForInference());
-
-			if (showUnexplainedProteomicData)
-			{
-				relations.stream().map(r -> r.sourceData).map(GeneWithData::getChangedProteomicData)
-					.flatMap(Collection::stream).forEach(set::add);
-				relations.stream().map(r -> r.targetData).map(GeneWithData::getChangedProteomicData)
-					.flatMap(Collection::stream).forEach(set::add);
-			}
-
-			writer.setExperimentDataToDraw(set);
-		}
-
-		if (!useCorrelation && showUnexplainedProteomicData)
-		{
-			Set<GeneWithData> set = relations.stream().map(r -> r.sourceData).filter(GeneWithData::hasChangedProteomicData).collect(Collectors.toSet());
-			relations.stream().map(r -> r.targetData).filter(GeneWithData::hasChangedProteomicData).forEach(set::add);
-			writer.setOtherGenesToShow(set);
-		}
 		if (useCorrelation)
 		{
 			writer.setExperimentDataToDraw(cs.getPairsUsedForInference().stream().flatMap(Collection::stream)
 				.collect(Collectors.toSet()));
+		}
+		else
+		{
+			if (showAllGenesWithProteomicData)
+			{
+				Set<GeneWithData> set = relations.stream().map(r -> r.sourceData).filter(GeneWithData::hasProteomicData).collect(Collectors.toSet());
+				relations.stream().map(r -> r.targetData).filter(GeneWithData::hasProteomicData).forEach(set::add);
+				writer.setOtherGenesToShow(set);
+			}
+			else if (hideDataNotPartOfCausalRelations)
+			{
+				writer.setExperimentDataToDraw(cs.getDataUsedForInference());
+			}
 		}
 
 		// Generate output
@@ -488,7 +491,7 @@ public class CausalPath
 		writer = new GraphWriter(conflicting, null);
 		writer.setUseGeneBGForTotalProtein(!useCorrelation);
 		writer.setColorSaturationValue(colorSaturationValue);
-		if (!showInsignificantProteinData) writer.setExperimentDataToDraw(cs.getDataUsedForInference());
+		if (!showInsignificantData) writer.setExperimentDataToDraw(cs.getDataUsedForInference());
 		if (useCorrelation)
 		{
 			writer.setExperimentDataToDraw(cs.getPairsUsedForInference().stream().flatMap(Collection::stream)
@@ -578,10 +581,20 @@ public class CausalPath
 				nsc = new NSCForNonCorr(relations, cs);
 			}
 
-			nsc.setMinimumPotentialTargetsToConsider(minimumPotentialTargetsToConsiderForDownstreamSignificance);
-			nsc.run(permutationCount);
+			String outFile = directory + File.separator + SIGNIFICANCE_FILENAME;
+
+			if (Files.exists(Paths.get(outFile)))
+			{
+				nsc.loadFromFile(outFile);
+			}
+			else
+			{
+				nsc.setMinimumPotentialTargetsToConsider(minimumPotentialTargetsToConsiderForDownstreamSignificance);
+				nsc.run(permutationCount);
+				nsc.writeResults(outFile);
+			}
+
 			nsc.setFDRThreshold(fdrThresholdForNetworkSignificance);
-			nsc.writeResults(directory + File.separator + SIGNIFICANCE_FILENAME);
 			System.out.println("Graph size pval = " + nsc.getOverallGraphSizePval());
 		}
 		return nsc;
@@ -594,6 +607,7 @@ public class CausalPath
 
 		datas = new HashSet<>(datas);
 		pairs = new HashSet<>(pairs);
+
 		cs.setCausal(false);
 		cs.setCollectDataUsedForInference(true);
 		Set<Relation> testedRels = cs.run(relations);
@@ -616,6 +630,20 @@ public class CausalPath
 		{
 			FDRAdjuster fad = new FDRAdjuster(directory, poolProteomicsForFDRAdjustment);
 			fad.adjustPValueThresholdsOfDatas(datas, fdrThresholdForDataSignificance);
+
+			// fdr adjust other data types on the nodes
+			Set<DataType> selectiveTypes = datas.stream().map(ExperimentData::getType).collect(Collectors.toSet());
+			Set<DataType> otherTypes = fdrThresholdForDataSignificance.keySet().stream()
+				.filter(t -> !selectiveTypes.contains(t)).collect(Collectors.toSet());
+
+			if (!otherTypes.isEmpty())
+			{
+				Set<ExperimentData> otherData = testedRels.stream().map(Relation::getAllData).flatMap(Collection::stream)
+					.collect(Collectors.toSet());
+				otherData = otherData.stream().filter(d -> otherTypes.contains(d.getType())).collect(Collectors.toSet());
+
+				fad.adjustPValueThresholdsOfDatas(otherData, fdrThresholdForDataSignificance);
+			}
 		}
 	}
 
@@ -930,15 +958,15 @@ public class CausalPath
 		ID_COLUMN((value, cp) -> cp.IDColumn = value,
 			"ID column in data file",
 			"The name of the ID column in platform and values files.",
-			new EntryType(String.class), new String[][]{{"ID"}}, false, false, null),
+			new EntryType(String.class), new String[][]{{"ID"}}, true, false, null),
 		SYMBOLS_COLUMN((value, cp) -> cp.symbolsColumn = value,
 			"Symbols column in data file",
 			"The name of the symbols column in platform file.",
-			new EntryType(String.class), new String[][]{{"Symbols"}}, false, false, null),
+			new EntryType(String.class), new String[][]{{"Symbols"}}, true, false, null),
 		SITES_COLUMN((value, cp) -> cp.sitesColumn = value,
 			"Sites column in data file",
 			"The name of the sites column.",
-			new EntryType(String.class), new String[][]{{"Sites"}}, false, false, null),
+			new EntryType(String.class), new String[][]{{"Sites"}}, true, false, null),
 		EFFECT_COLUMN((value, cp) -> cp.effectColumn = value,
 			"Site effect column in data file",
 			"The name of the effect column.",
@@ -1013,25 +1041,38 @@ public class CausalPath
 			cp.fdrThresholdForDataSignificance.put(DataType.get(s[1]), Double.valueOf(s[0]));
 		},
 			"FDR threshold for data significance",
-			"False discovery rate threshold for data significance. This parameter can be use multiple times for each " +
-				"different data type. The parameter value has to be in the form 'fdr-val data-type', such like " +
-				"'0.1 phosphoprotein'. Possible data types are below",
+			"False discovery rate threshold for data significance. This parameter can be set for each " +
+				"different data type separately. The parameter value has to be in the form 'fdr-val data-type', such like " +
+				"'0.1 phosphoprotein'.",
 			new EntryType(Double.class, DataType.class), null, false, true,
 			new Cond(Logical.AND,
-				new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name)),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
 				new Cond(THRESHOLD_FOR_DATA_SIGNIFICANCE.getText(), null))),
+		STDEV_THRESHOLD_FOR_DATA((value, cp) ->
+		{
+			if (cp.stDevThresholds == null) cp.stDevThresholds = new HashMap<>();
+			String[] s = value.split("\\s+");
+			cp.stDevThresholds.put(DataType.get(s[1]), Double.valueOf(s[0]));
+		},
+			"Standard deviation threshold for data",
+			"This parameter can be set for each different data type separately. The parameter value has to be in the" +
+				" form 'stdev-thr data-type', such like '0.5 phosphoprotein'.",
+			new EntryType(Double.class, DataType.class), null, false, true,
+			new Cond(Logical.OR,
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name))),
 		POOL_PROTEOMICS_FOR_FDR_ADJUSTMENT((value, cp) -> cp.poolProteomicsForFDRAdjustment = Boolean.valueOf(value),
 			"Pool proteomics data for FDR adjustment",
 			"Whether to consider proteomic and phosphoproteomic data as a single dataset during FDR adjustment. This " +
 				"is typically the case with RPPA data, and typically not the case with mass spectrometry data. Can be" +
 				" 'true' or 'false'. Default is false.",
-			new EntryType(Boolean.class), new String[][]{{"true"}}, false, false,
+			new EntryType(Boolean.class), new String[][]{{"true"}}, true, false,
 			new Cond(Logical.NOT, new Cond(FDR_THRESHOLD_FOR_DATA_SIGNIFICANCE.getText(), null))),
 		CALCULATE_NETWORK_SIGNIFICANCE((value, cp) -> cp.calculateNetworkSignificance = Boolean.valueOf(value),
 			"Calculate network significance",
 			"Whether to calculate significances of the properties of the graph. When turned on, a p-value for network" +
 				" size, and also downstream activity enrichment p-values for each gene on the graph are calculated.",
-			new EntryType(Boolean.class), new String[][]{{"false"}}, false, false, null),
+			new EntryType(Boolean.class), new String[][]{{"false"}}, true, false, null),
 		PERMUTATIONS_FOR_SIGNIFICANCE((value, cp) -> cp.permutationCount = Integer.valueOf(value),
 			"Number of permutations for calculating network significance",
 			"We will do data randomization to see if the result network is large, or any protein's downstream is " +
@@ -1051,7 +1092,7 @@ public class CausalPath
 			"Threshold for correlation value",
 			"Option to control correlation with its value. This cannot be used with FDR control, but can be used with" +
 				" p-value control.",
-			new EntryType(Double.class), new String[][]{{"0"}}, false, false,
+			new EntryType(Double.class), null, false, false,
 			new Cond(Logical.AND,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
 				new Cond("fdr-threshold-for-correlation", null))), // typing out the parameter name due to illegal forward reference
@@ -1059,7 +1100,7 @@ public class CausalPath
 			"P-value threshold for correlation",
 			"A p-value threshold for correlation in a correlation-based causality. This parameter should only be used" +
 				" when FDR control is performed outside of CausalPath.",
-			new EntryType(Double.class), new String[][]{{"0.01"}}, false, false,
+			new EntryType(Double.class), null, false, false,
 			new Cond(Logical.AND,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
 				new Cond("fdr-threshold-for-correlation", null))), // typing out the parameter name due to illegal forward reference
@@ -1083,7 +1124,7 @@ public class CausalPath
 				"modified, which is very close to another site with a known effect. This parameter let's us to assume" +
 				" those changing sites with unknown effect has the same effect with the neighbor site with known " +
 				"effect. Use responsibly.",
-			new EntryType(Double.class), new String[][]{{"0"}}, false, false, null),
+			new EntryType(Double.class), new String[][]{{"0"}}, true, false, null),
 		DO_SITE_MATCHING((value, cp) -> cp.cs.setForceSiteMatching(Boolean.valueOf(value)),
 			"Do site matching",
 			"Whether to force site matching in causality analysis. True by default.",
@@ -1146,28 +1187,47 @@ public class CausalPath
 		COLOR_SATURATION_VALUE((value, cp) -> cp.colorSaturationValue = Double.valueOf(value),
 			"Node color saturation value",
 			"Specifies the value where node colors reach most intense color. Has to be a positive value, and used " +
-				"symmetrically.",
+				"symmetrically. In the case of value-transformation is significant-change-of-mean, the value is " +
+				"-log(p) with a sign associated to it.",
 			new EntryType(Double.class), new String[][]{{"1"}}, false, false,
 			new Cond( Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
-		SHOW_UNEXPLAINED_PROTEOMIC_DATA((value, cp) -> cp.showUnexplainedProteomicData = Boolean.valueOf(value),
+		SHOW_ALL_GENES_WITH_PROTEOMIC_DATA((value, cp) -> cp.showAllGenesWithProteomicData = Boolean.valueOf(value),
 			"Show unexplained proteomic data",
 			"CausalPath generates a result graph, but what about all other significant changes that could not make " +
 				"into the network? CausalPath puts those genes as disconnected nodes in the graph when the analysis " +
 				"is not correlation based. This is true by default but can be turned off by setting to false.",
-			new EntryType(Boolean.class), new String[][]{{"true"}}, false, false,
+			new EntryType(Boolean.class), new String[][]{{"true"}}, true, false,
 			new Cond( Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
+		SHOW_INSIGNIFICANT_DATA((value, cp) ->
+			cp.showInsignificantData = Boolean.valueOf(value),
+			"Show insignificant proteomic data on the graph",
+			"Option to make the insignificant protein data on the result graph visible. Seeing these is good for " +
+				"seeing what is being measured, but when they are too much, turning off generates a a better view.",
+			new EntryType(Boolean.class), new String[][]{{"false"}}, true, false,
+			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
+		HIDE_DATA_NOT_PART_OF_CAUSAL_RELATIONS((value, cp) ->
+			cp.hideDataNotPartOfCausalRelations = Boolean.valueOf(value),
+			"Hide data which did not contribute causal relations",
+			"Limits the data drawn on the result graph to the ones that take part in the identified causal relations.",
+			new EntryType(Boolean.class), new String[][]{{"false"}}, true, false,
+			new Cond(Logical.AND,
+				new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name)),
+				new Cond(SHOW_ALL_GENES_WITH_PROTEOMIC_DATA.getText(), "false"))),
 		BUILT_IN_NETWORK_RESOURCE_SELECTION((value, cp) -> cp.networkSelection = value,
 			"Built-in network resources to use",
 			"Determines which network resource to use during the analysis. Multiple network resource should be " +
 				"mentioned together, separated with a space or comma. Possible values are below.\n" +
 				NetworkLoader.ResourceType.getUsageInfo(),
-			new EntryType(NetworkLoader.ResourceType.class), new String[][]{{NetworkLoader.ResourceType.PC.name()}},
-			false, true, null),
+			new EntryType(NetworkLoader.ResourceType.class), new String[][]{{
+				NetworkLoader.ResourceType.PC.name(),
+				NetworkLoader.ResourceType.PhosphoNetworks.name(),
+				NetworkLoader.ResourceType.IPTMNet.name()}},
+			true, true, null),
 		GENERATE_DATA_CENTRIC_GRAPH((value, cp) -> cp.generateDataCentricGraph = Boolean.valueOf(value),
 			"Generate a data-centric view as well",
 			"An alternative to the gene-centric graph of CausalPath is a data-centric graph where nodes are not genes" +
 				" but the data. This parameter forces to generate this type of result as well. False by default.",
-			new EntryType(Boolean.class), new String[][]{{"false"}}, false, false, null),
+			new EntryType(Boolean.class), new String[][]{{"false"}}, true, false, null),
 		CORRELATION_UPPER_THRESHOLD((value, cp) -> cp.correlationUpperThreshold = Double.valueOf(value),
 			"An upper threshold for correlation value",
 			"In some types of proteomic data, highest correlations come from errors. A way around is filtering with " +
@@ -1178,7 +1238,7 @@ public class CausalPath
 			"Minimum sample size",
 			"When there are missing values in proteomic file, the comparisons can have different sample sizes for " +
 				"controls and tests. This parameter sets the minimum sample size of the control and test sets.",
-			new EntryType(Integer.class), new String[][]{{"3"}}, false, false,
+			new EntryType(Integer.class), new String[][]{{"3"}}, true, false,
 			new Cond(Logical.OR,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name))),
@@ -1209,14 +1269,14 @@ public class CausalPath
 				"have evidences for both activation and inhibition. This produces networks hard to read. A complexity" +
 				" management technique is to turn on this parameter to use only the strongest proteomic feature at " +
 				"the upstream of relations. This is false by default.",
-			new EntryType(Boolean.class), new String[][]{{"false"}}, false, false, null),
+			new EntryType(Boolean.class), new String[][]{{"false"}}, true, false, null),
 		USE_NETWORK_SIGNIFICANCE_FOR_CAUSAL_REASONING((value, cp) ->
 			cp.useNetworkSignificanceForCausalReasoning = Boolean.valueOf(value),
 			"Use network significance for causal reasoning",
 			"After calculation of network significances in a non-correlation-based analysis, this option introduces" +
 				" the detected active and inactive proteins as data to be used in the analysis. This applies only to " +
 				"the proteins that already have a changed data on them, and have no previous activity data associated.",
-		new EntryType(Boolean.class), new String[][]{{"false"}}, false, false,
+		new EntryType(Boolean.class), new String[][]{{"false"}}, true, false,
 		new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		MINIMUM_POTENTIAL_TARGETS_TO_CONSIDER_FOR_DOWNSTREAM_SIGNIFICANCE((value, cp) ->
 			cp.minimumPotentialTargetsToConsiderForDownstreamSignificance = Integer.valueOf(value),
@@ -1224,20 +1284,15 @@ public class CausalPath
 			"While calculating downstream significance for each source gene, we may not like to include those genes " +
 				"with already few qualifying targets to reduce noise in data and reduce the number of tested " +
 				"hypotheses.",
-			new EntryType(Integer.class), new String[][]{{"3"}}, false, false,
+			new EntryType(Integer.class), new String[][]{{"5"}}, true, false,
 			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), "true")),
-		SHOW_INSIGNIFICANT_PROTEOMIC_DATA((value, cp) ->
-			cp.showInsignificantProteinData = Boolean.valueOf(value),
-			"Show insignificant proteomic data on the graph",
-			"Option to make the insignificant protein data on the result graph visible. Seeing these is good for " +
-				"seeing what is being measured, but when they are too much, turning off generates a a better view.",
-			new EntryType(Boolean.class), new String[][]{{"false"}}, false, false,
-			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		USE_MISSING_PROTEOMIC_DATA_FOR_TEST((value, cp) ->
 			cp.testMissingValues = Boolean.valueOf(value),
 			"Include missing proteomic data in tests",
 			"Option to use a G-test to check unequal distribution of missing values. If opted, and data is sufficient" +
-				", the G-test result is combined with t-test result with Fisher's method.",
+				", the G-test result is combined with t-test result with Fisher's method. But beware. This method " +
+				"assumes that missing values are uniformly distributed to samples. If this is violated, then false " +
+				"positives will appear. If you are not sure, stay away from this option.",
 			new EntryType(Boolean.class), new String[][]{{"false"}}, true, false,
 			new Cond(Logical.OR,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
@@ -1401,6 +1456,8 @@ public class CausalPath
 		String param;
 		String[] value;
 
+		static final List<String> nullList = new ArrayList<>(Collections.singletonList(null));
+
 		public Cond(String param, String... value)
 		{
 			if (value != null && value.length == 0)
@@ -1426,7 +1483,7 @@ public class CausalPath
 			if (op == null)
 			{
 				map.put("Parameter", param);
-				map.put("Value", value == null ? null : Arrays.asList(value));
+				map.put("Value", value == null ? nullList : Arrays.asList(value));
 			}
 			else
 			{

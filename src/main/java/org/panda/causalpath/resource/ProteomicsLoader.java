@@ -7,6 +7,7 @@ import org.panda.causalpath.network.Relation;
 import org.panda.resource.tcga.ProteomicsFileRow;
 import org.panda.utility.ArrayUtil;
 import org.panda.utility.statistics.Histogram;
+import org.panda.utility.statistics.Summary;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -29,7 +30,7 @@ public class ProteomicsLoader
 	/**
 	 * Initializes self using a set of RPPAData.
 	 */
-	public ProteomicsLoader(Collection<ProteomicsFileRow> rows)
+	public ProteomicsLoader(Collection<ProteomicsFileRow> rows, Map<DataType, Double> stdevThresholds)
 	{
 		dataMap = new HashMap<>();
 		datas = new HashSet<>();
@@ -38,12 +39,49 @@ public class ProteomicsLoader
 			ExperimentData ed = r.isActivity() ? new ActivityData(r) :
 				r.isPhospho() ? new PhosphoProteinData(r) : new ProteinData(r);
 
+			if (stdevThresholds != null && ed instanceof NumericData)
+			{
+				DataType type = ed.getType();
+				Double thr = stdevThresholds.get(type);
+				if (thr != null)
+				{
+					double sd = Summary.stdev(((NumericData) ed).vals);
+					if (Double.isNaN(sd) || sd < thr) return;
+				}
+			}
+
 			for (String sym : ed.getGeneSymbols())
 			{
 				if (!dataMap.containsKey(sym)) dataMap.put(sym, new HashSet<>());
 				dataMap.get(sym).add(ed);
 				datas.add(ed);
 			}
+		});
+	}
+
+	public void printStDevHistograms()
+	{
+		printStDevHistograms(datas);
+	}
+	public void printStDevHistograms(Set<ExperimentData> datas)
+	{
+		System.out.println("\nSt-dev histograms:");
+		Map<DataType, Histogram> hMap = new HashMap<>();
+		datas.stream().filter(d -> d instanceof NumericData).map(d -> (NumericData) d).forEach(d ->
+		{
+			DataType type = d.getType();
+			if (!hMap.containsKey(type))
+			{
+				Histogram h = new Histogram(0.05);
+				h.setBorderAtZero(true);
+				hMap.put(type, h);
+			}
+			hMap.get(type).count(Summary.stdev(d.vals));
+		});
+		hMap.keySet().forEach(k ->
+		{
+			System.out.println("type = " + k);
+			hMap.get(k).print();
 		});
 	}
 

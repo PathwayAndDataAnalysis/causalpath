@@ -94,7 +94,7 @@ public class CausalityAnalysisSingleMethodInterface
 		String graphType, boolean doSiteMatch, int siteMatchProximityThreshold, boolean geneCentric,
 		double colorSaturationValue, String outputFilePrefix) throws IOException
 	{
-		ProteomicsLoader loader = new ProteomicsLoader(rows);
+		ProteomicsLoader loader = new ProteomicsLoader(rows, null);
 		// Associate change detectors
 		loader.associateChangeDetector(new ThresholdDetector(valueThreshold, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN), data -> data instanceof ProteinData);
 		loader.associateChangeDetector(new ThresholdDetector(0.1, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN), data -> data instanceof ActivityData);

@@ -61,6 +61,7 @@ public abstract class NetworkSignificanceCalculator
 
 	/**
 	 * Sets the FDR threshold for the network significance.
+	 *
 	 * @param fdrThr the FDR threshold
 	 */
 	public abstract void setFDRThreshold(double fdrThr);
@@ -72,6 +73,7 @@ public abstract class NetworkSignificanceCalculator
 
 	/**
 	 * Gets the p-val for the network size.
+	 *
 	 * @return p-val
 	 */
 	public double getOverallGraphSizePval()
@@ -81,12 +83,14 @@ public abstract class NetworkSignificanceCalculator
 
 	/**
 	 * Gets the map of downstream activity size p-vals for each gene.
+	 *
 	 * @return p-vals map
 	 */
 	public abstract Map<String, Double> getDownstreamActivityPvals();
 
 	/**
 	 * Checks if the amount of downstream activities are significantly large.
+	 *
 	 * @param gene gene of interest
 	 * @return true if significantly large
 	 */
@@ -97,8 +101,17 @@ public abstract class NetworkSignificanceCalculator
 
 	/**
 	 * Write gene significances to a file.
+	 *
 	 * @param filename file name
 	 * @throws IOException
 	 */
 	public abstract void writeResults(String filename) throws IOException;
+
+	/**
+	 * Reads significances from the given file. This method is mostly for debugging purposes, when we don't want to
+	 * spend too much time with calculations but to use results from a previous calculation.
+	 * @param filename file name
+	 * @throws IOException
+	 */
+	public abstract void loadFromFile(String filename) throws IOException;
 }

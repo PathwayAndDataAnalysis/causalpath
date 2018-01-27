@@ -82,6 +82,8 @@ public class GraphWriter
 
 	private Set<GeneWithData> otherGenesToShow;
 
+	private boolean showInsignificantData = false;
+
 	/**
 	 * Constructor with the relations. Those relations are the result of the causality search.
 	 */
@@ -180,6 +182,11 @@ public class GraphWriter
 		this.otherGenesToShow = set;
 	}
 
+	public void setShowInsignificantData(boolean showInsignificantData)
+	{
+		this.showInsignificantData = showInsignificantData;
+	}
+
 	/**
 	 * Produces a causality graph where each node corresponds to a gene. In this graph, data may be displayed more than
 	 * once if they map to more than one gene. The output .sif and .format files can be visualized using ChiBE. From
@@ -212,13 +219,18 @@ public class GraphWriter
 		dataInGraph.forEach(data ->
 		{
 			String colS = "255 255 255";
-			String bor = inString(defaultBorderColor);
-			String let = "x";
 
 			if (data.hasChangeDetector())
 			{
-				if (data.getChangeSign() != 0) colS = vtc.getColorInString(data.getChangeValue());
+				if (data.getChangeSign() != 0)
+				{
+					colS = vtc.getColorInString(data.getChangeValue());
+				}
+				else return;
 			}
+
+			String bor = inString(defaultBorderColor);
+			String let = "x";
 
 			if (data instanceof PhosphoProteinData)
 			{
@@ -293,11 +305,6 @@ public class GraphWriter
 			}
 		});
 
-		if (otherGenesToShow != null)
-		{
-
-		}
-
 		writer2.close();
 	}
 
@@ -350,6 +357,7 @@ public class GraphWriter
 				}
 			}
 		});
+		writer1.close();
 
 		filename = filename.substring(0, filename.lastIndexOf(".")) + ".format";
 		BufferedWriter writer2 = new BufferedWriter(new FileWriter(filename));
@@ -367,7 +375,6 @@ public class GraphWriter
 					inString(data.getEffect() == -1 ? inhibitingBorderColor : activatingBorderColor), writer2);
 			}
 		});
-
 		writer2.close();
 	}
 
@@ -410,13 +417,18 @@ public class GraphWriter
 		dataInGraph.forEach(data ->
 		{
 			String colS = "255 255 255";
-			String bor = inJSONString(defaultBorderColor);
-			String let = "x";
 
 			if (data.hasChangeDetector())
 			{
-				if (data.getChangeSign() != 0) colS = vtc.getColorInJSONString(data.getChangeValue());
+				if (data.getChangeSign() != 0)
+				{
+					colS = vtc.getColorInJSONString(data.getChangeValue());
+				}
+				else return;
 			}
+
+			String bor = inJSONString(defaultBorderColor);
+			String let = "x";
 
 			if (data instanceof PhosphoProteinData)
 			{

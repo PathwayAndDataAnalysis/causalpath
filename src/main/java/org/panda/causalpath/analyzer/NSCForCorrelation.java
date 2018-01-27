@@ -171,4 +171,15 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 
 		writer.close();
 	}
+
+	public void loadFromFile(String filename) throws IOException
+	{
+		String line = Files.lines(Paths.get(filename)).findFirst().get();
+		this.graphSizePval = Double.valueOf(line.substring(line.lastIndexOf(" ") + 1));
+
+		this.pvals = new HashMap<>();
+
+		Files.lines(Paths.get(filename)).skip(2).map(l -> l.split("\t")).forEach(t ->
+			pvals.put(t[0], Double.valueOf(t[1])));
+	}
 }

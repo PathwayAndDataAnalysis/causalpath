@@ -23,7 +23,8 @@ public class DataLabelShufflerForCorrelation extends DataLabelShuffler
 		init(relations);
 		correlationMap = new HashMap<>();
 
-		ChDet det = new ChDet(relations.iterator().next().chDet);
+		TwoDataChangeDetector det = relations.iterator().next().chDet;
+		if (USE_CACHE) det = new ChDet(det);
 		this.relations.forEach(r -> r.setChDet(det));
 	}
 

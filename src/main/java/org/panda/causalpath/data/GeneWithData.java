@@ -162,6 +162,15 @@ public class GeneWithData
 	}
 
 	/**
+	 * Tells if this gene is associated with any prooteomics or phosphoproteomics data.
+	 * @return true if there is any
+	 */
+	public boolean hasProteomicData()
+	{
+		return !getData(DataType.PROTEIN, DataType.PHOSPHOPROTEIN).isEmpty();
+	}
+
+	/**
 	 * Gets the set of chnaged proteomic data
 	 * @return proteomic data with a significant change
 	 */

@@ -252,4 +252,23 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 
 		writer.close();
 	}
+
+	public void loadFromFile(String filename) throws IOException
+	{
+		String line = Files.lines(Paths.get(filename)).findFirst().get();
+		this.graphSizePval = Double.valueOf(line.substring(line.lastIndexOf(" ") + 1));
+
+		this.pvalMaps = new Map[3];
+		for (int i = 0; i < pvalMaps.length; i++)
+		{
+			pvalMaps[i] = new HashMap<>();
+		}
+
+		Files.lines(Paths.get(filename)).skip(2).map(l -> l.split("\t")).forEach(t ->
+		{
+			pvalMaps[0].put(t[0], Double.valueOf(t[1]));
+			pvalMaps[1].put(t[0], Double.valueOf(t[2]));
+			pvalMaps[2].put(t[0], Double.valueOf(t[3]));
+		});
+	}
 }
