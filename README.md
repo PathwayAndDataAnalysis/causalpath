@@ -3,7 +3,7 @@ This is a tool for pathway analysis of proteomic and phosphoproteomic datasets. 
 
 ![CausalPath sample output network](wiki/sample.png "Exploring the reasons for the downregulation of MAPK3 and its downstream effects.")
 
-To analyze your dataset, please visit our **[web-service](http://104.198.75.85:3001/)** that runs an instance of CausalPath.
+To analyze your dataset, please visit our **[web-service](http://www.causalpath.org)** that runs an instance of CausalPath.
 
 Alternatively, users can locally run the Java code in this project on their datasets, and visualize the results in [ChiBE](https://github.com/PathwayCommons/chibe). But in both cases, to use this tool, users need to [prepare input files](wiki/InputFormat.md) to feed into the analysis.
 
