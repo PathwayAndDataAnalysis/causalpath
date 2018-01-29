@@ -141,7 +141,7 @@ public class CausalPath
 	/**
 	 * A correlation FDR threshold when the value transformation is correlation. When this is used,
 	 */
-	private double fdrThresholdForCorrelation = 0.1;
+	private double fdrThresholdForCorrelation = -1;
 
 	/**
 	 * Proximity threshold to infer effects of unknown sites by the known effect of neighbor sites.
@@ -344,7 +344,8 @@ public class CausalPath
 
 		// Mark some decisions
 		boolean useCorrelation = transformation == ValueTransformation.CORRELATION;
-		boolean controlFDR = fdrThresholdForDataSignificance != null || fdrThresholdForCorrelation > 0;
+		boolean controlFDR = (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN && fdrThresholdForDataSignificance != null) ||
+			(transformation == ValueTransformation.CORRELATION && fdrThresholdForCorrelation > 0);
 
 		Set<String> dataIDs = null;
 		if (randomizedMatrixDirectory != null)
