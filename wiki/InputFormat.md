@@ -23,7 +23,7 @@ CausalPath reads the proteomics dataset from a tab-delimited text file where the
 
 The name of the parameters file have to be `parameters.txt` exactly. Each parameter in this file should be given in a separate line, in the format `parameter-name = parameter-value`. Below are list of possible parameters and their description.
 
-`proteomics-values-file`: The data file that contains peptides on rows and samples on columns.
+`proteomics-values-file`: The data file that contains peptides on rows and samples on columns. Long long long long long long long long long lonf text.
 
 `proteomics-values-file`: The data file that contains peptides on rows and samples on columns.
 
