@@ -15,7 +15,7 @@ CausalPath reads the proteomics dataset from a tab-delimited text file where the
 
 **Sites:** If the row contains a phosphoprotein measurement, this column should indicate protein sites that are affected. The format for the site is one letter capital aminoacid code, following an integer for the location on the UniProt caconical sequence, such as `Y142`, or `S78`. When there is more than one related site, they should be separated with a pipe (`|`), such like `S151|T153`, to form a site group. If the row is related to more than one gene symbol, there should exists a site group for each symbol, separated with a single space.
 
-**Effect:** If the row is a phosphoprotein measurement, this column can contain the effect of the related phosphorylation on the protein activity. Please use `a` for activating, `i` for inhibiting phosphorylations. If the effect is too complex for a simple classification, then you can use `c` for complex effect. But `c` will remove this row from analysis, as CausalPath cannot evaluate complex effects. If this column is left blank for a row, then CausalPath looks it up from its database, which we compiled from PhosphoSitePlus and other resources.
+**Effect:** If the row is a phosphoprotein measurement, this column can contain the effect of the related phosphorylation on the protein activity. Please use `a` for activating and `i` for inhibiting phosphorylations. If the effect is too complex for a simple classification, then you can leave it blank (preferred) or use a `c` for the complex effect. But `c` will remove this row from possible causes, as CausalPath cannot evaluate complex effects. If this column is left blank for a row, then CausalPath looks it up from its database, which we compiled from PhosphoSitePlus and other resources.
 
 **Value:** The numeric value for the row. There can be more than one value columns, but of course each of them with a unique name. There are many ways to encode values in the data file. They may represent normalized protein reads, or they can be comparison values like fold changes. The nature of the values has to be specified in the parameters file.
 
@@ -61,9 +61,9 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `do-log-transform`: Whether the proteomic values should be log transformed for the analysis. Possible values are 'true' and 'false'.
 
-`threshold-for-data-significance`: A threshold value for selecting significant data. Use this parameter only when FDR controlling procedureis already performed outside of CausalPath.
+`threshold-for-data-significance`: A threshold value for selecting significant data. Use this parameter only when FDR controlling procedure is already performed outside of CausalPath. This parameter can be set for each different data type separately. The parameter value has to be in the form 'thr-val data-type', such like '1 phosphoprotein' or '2 protein.
 
-`fdr-threshold-for-data-significance`: False discovery rate threshold for data significance. This parameter can be set for each different data type separately. The parameter value has to be in the form 'fdr-val data-type', such like '0.1 phosphoprotein'.
+`fdr-threshold-for-data-significance`: False discovery rate threshold for data significance. This parameter can be set for each different data type separately. The parameter value has to be in the form 'fdr-val data-type', such like '0.1 phosphoprotein' or '0.05 protein.
 
 `pool-proteomics-for-fdr-adjustment`: Whether to consider proteomic and phosphoproteomic data as a single dataset during FDR adjustment. This is typically the case with RPPA data, and typically not the case with mass spectrometry data. Can be 'true' or 'false'. Default is false.
 
