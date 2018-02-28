@@ -35,7 +35,7 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `effect-column`: The name of the effect column.
 
-`value-transformation`: This parameter determines how to use the values in the proteomics file. Possible values are listed below.
+`value-transformation`: This parameter determines how to use the values in the proteomics file. Possible values are listed below. When there is only one value column and no transformation is desired, users can select either 'max' or one of the means, as they have no effect on a single value.
 
 	arithmetic-mean: The arithmetic mean value of the given values is used for significance detection of a single change. There should only be one group of values (marked with value-column), the values have to be distributed around zero, and a threshold value should be provided for significance detection, using the threshold-for-data-significance.
 
@@ -137,7 +137,7 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `hide-data-not-part-of-causal-relations`: Limits the data drawn on the result graph to the ones that take part in the identified causal relations.
 
-`data-type-indicative-of-expression`: By default, CausalPath generates explanations only for proteomic changes. But it is possible to explain RNA changes with expressional relations as well, and it is a more direct explanation than total protein measurement. This parameter lets users to control possible data types explainable by expressional relations. Typical values are 'rna' and 'protein'.
+`data-type-for-expressional-targets`: By default, CausalPath generates explanations only for proteomic changes. But it is possible to explain RNA changes with expressional relations as well, and it is a more direct explanation than total protein measurement. This parameter lets users to control possible data types explainable by expressional relations. Typical values are 'rna' and 'protein'. This parameter can also  be used multiple times to use rna and protein data together.
 
 `generate-data-centric-graph`: An alternative to the gene-centric graph of CausalPath is a data-centric graph where nodes are not genes but the data. This parameter forces to generate this type of result as well. False by default.
 
