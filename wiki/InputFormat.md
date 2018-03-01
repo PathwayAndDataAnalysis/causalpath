@@ -89,7 +89,7 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `use-network-significance-for-causal-reasoning`: After calculation of network significances in a non-correlation-based analysis, this option introduces the detected active and inactive proteins as data to be used in the analysis. This applies only to the proteins that already have a changed data on them, and have no previous activity data associated.
 
-`minimum-potential-targets-to-consider-for-downstream-significance`: While calculating downstream significance for each source gene, we may not like to include those genes with already few qualifying targets to reduce noise in data and reduce the number of tested hypotheses.
+`minimum-potential-targets-to-consider-for-downstream-significance`: While calculating downstream significance for each source gene, we may not like to include those genes with just a few qualifying targets to reduce the number of tested hypotheses. These genes may not be significant even all their targets are in the results, and since we use Benjamini-Hochberg procedure to control false discovery rate from multiple hypothesis testing, their presence will hurt the statistical power. Use this parameter to exclude genes with few qualifying targets on the network. Default is 5.
 
 `do-site-matching`: Whether to force site matching in causality analysis. True by default.
 
