@@ -35,7 +35,7 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `effect-column`: The name of the effect column.
 
-`value-transformation`: This parameter determines how to use the values in the proteomics file. Possible values are listed below. When there is only one value column and no transformation is desired, users can select either 'max' or one of the means, as they have no effect on a single value.
+`value-transformation`: This parameter determines how to use the values in the proteomics file. Options are listed below. When there is only one value column and no transformation is desired, users can select any of the first 3 options, as they have no effect on a single value.
 
 	arithmetic-mean: The arithmetic mean value of the given values is used for significance detection of a single change. There should only be one group of values (marked with value-column), the values have to be distributed around zero, and a threshold value should be provided for significance detection, using the threshold-for-data-significance.
 
