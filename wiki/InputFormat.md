@@ -59,7 +59,7 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `test-value-column`: Name of a test value column. This parameter should be used when there are control and test value columns in the dataset.
 
-`do-log-transform`: Whether the proteomic values should be log transformed for the analysis. Possible values are 'true' and 'false'.
+`do-log-transform`: Whether the proteomic values should be log transformed for the analysis. Possible values are 'true' and 'false'. Default is false.
 
 `threshold-for-data-significance`: A threshold value for selecting significant data. Use this parameter only when FDR controlling procedure is already performed outside of CausalPath. This parameter can be set for each different data type separately. The parameter value has to be in the form 'thr-val data-type', such like '1 phosphoprotein' or '2 protein.
 
