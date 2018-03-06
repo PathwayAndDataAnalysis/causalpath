@@ -33,7 +33,7 @@ public class RobustnessAnalysis
 	CorrelationDetector corrDet;
 
 	Set<ExperimentData> data;
-	Set<Set<ExperimentData>> pairs;
+	Set<List<ExperimentData>> pairs;
 
 	public RobustnessAnalysis(CausalitySearcher cs, Set<Relation> relations, Map<DataType, Double> fdrThr,
 		double noiseStDev, boolean correlationBased, double fdrThresholdForCorrelation, CorrelationDetector corrDet)

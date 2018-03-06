@@ -49,16 +49,20 @@ public abstract class ExperimentData
 
 	public int getChangeSign()
 	{
-		if (chDet == null) throw new RuntimeException("getChangeSign can be called only after setting the change " +
-			"detector.");
+		if (chDet == null)
+		{
+			throw new RuntimeException("getChangeSign can be called only after setting the change detector.");
+		}
 
 		return chDet.getChangeSign(this);
 	}
 
 	public double getChangeValue()
 	{
-		if (chDet == null) throw new RuntimeException("getChangeValue can be called only after setting the change " +
-			"detector.");
+		if (chDet == null)
+		{
+			throw new RuntimeException("getChangeValue can be called only after setting the change detector.");
+		}
 
 		return chDet.getChangeValue(this);
 	}

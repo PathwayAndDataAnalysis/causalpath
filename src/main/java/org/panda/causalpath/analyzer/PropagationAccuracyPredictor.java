@@ -32,8 +32,8 @@ public class PropagationAccuracyPredictor
 			int approve = causalUpstr.containsKey(target) ? causalUpstr.get(target).size() : 0;
 			int disapp = conflictUpstr.containsKey(target) ? conflictUpstr.get(target).size() : 0;
 
-			if (approve > disapp) successFail[0]++;
-			else if (approve < disapp) successFail[1]++;
+			if (approve > 0 && disapp == 0) successFail[0]++;
+			else if (approve == 0 && disapp > 0) successFail[1]++;
 		});
 
 		return successFail[0] / (double) (successFail[0] + successFail[1]);

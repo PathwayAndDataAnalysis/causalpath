@@ -408,6 +408,15 @@ public class GraphWriter
 			dMap.put("target", rel.target);
 			dMap.put("edgeType", rel.type.name);
 			dMap.put("tooltipText", CollectionUtil.merge(rel.getTargetWithSites(0), ", "));
+
+			if (rel.getMediators() != null)
+			{
+				List<String> medList = Arrays.asList(rel.getMediators().split(";| "));
+				if (!medList.isEmpty())
+				{
+					dMap.put("pcLinks", medList);
+				}
+			}
 		});
 
 		Set<String> totalProtUsedUp = new HashSet<>();

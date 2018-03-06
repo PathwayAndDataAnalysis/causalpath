@@ -4,7 +4,13 @@ import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
 import org.panda.utility.CollectionUtil;
+import org.panda.utility.FileUtil;
+import org.panda.utility.Tuple;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,12 +59,17 @@ public class CausalitySearcher implements Cloneable
 	/**
 	 * Set of pairs of data that contributed to inference.
 	 */
-	private Map<Relation, Set<Set<ExperimentData>>> pairsUsedForInference;
+	private Map<Relation, Set<List<ExperimentData>>> pairsUsedForInference;
 
 	/**
 	 * If true, then an expression relation has to have an Activity data at its source.
 	 */
 	protected boolean mandateActivityDataUpstreamOfExpression;
+
+	/**
+	 * The data types that can be used for evidence of expression change. This is typically protein or rna or both.
+	 */
+	protected DataType[] expressionEvidence;
 
 	/**
 	 * When true, this class uses only the strongest changing proteomic data with known effect as general activity
@@ -259,7 +270,7 @@ public class CausalitySearcher implements Cloneable
 
 				dataUsedForInference.get(rel).add(sourceData);
 				dataUsedForInference.get(rel).add(targetData);
-				pairsUsedForInference.get(rel).add(new HashSet<>(Arrays.asList(sourceData, targetData)));
+				pairsUsedForInference.get(rel).add(Arrays.asList(sourceData, targetData));
 			}
 			return true;
 		}
@@ -386,6 +397,7 @@ public class CausalitySearcher implements Cloneable
 
 	public Set<ExperimentData> getEvidenceForExpressionChange(GeneWithData gene)
 	{
+		if (expressionEvidence != null) return gene.getData(expressionEvidence);
 		return gene.getData(DataType.PROTEIN);
 	}
 
@@ -415,6 +427,46 @@ public class CausalitySearcher implements Cloneable
 		}
 	}
 
+	public void writeResults(String filename) throws IOException
+	{
+		if (pairsUsedForInference.isEmpty()) return;
+
+		TwoDataChangeDetector relDet = pairsUsedForInference.keySet().iterator().next().chDet;
+		CorrelationDetector corDet = relDet instanceof CorrelationDetector ? (CorrelationDetector) relDet : null;
+
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get(filename));
+		writer.write("Source\tRelation\tTarget\tSites\t");
+		if (corDet != null) writer.write("Source data ID\tTarget data ID\tCorrelation\tCorrelation pval");
+		else writer.write("Source data ID\tSource change\t Source change pval\tTarget data ID\tTarget change\tTarget change pval");
+
+		pairsUsedForInference.keySet().stream().forEach(r -> pairsUsedForInference.get(r).stream().forEach(pair ->
+		{
+			Iterator<ExperimentData> iter = pair.iterator();
+			ExperimentData sourceData = iter.next();
+			ExperimentData targetData = iter.next();
+
+			FileUtil.lnwrite(r.source + "\t" + r.type.name + "\t" + r.target + "\t" + r.getSitesInString() + "\t", writer);
+
+			if (corDet != null)
+			{
+				Tuple t = corDet.calcCorrelation(sourceData, targetData);
+				FileUtil.write(sourceData.getId() + "\t" + targetData.getId() + "\t" + t.v + "\t" + t.p, writer);
+			}
+			else
+			{
+				OneDataChangeDetector sDet = sourceData.getChDet();
+				OneDataChangeDetector tDet = targetData.getChDet();
+
+				FileUtil.write(sourceData.getId() + "\t" + sourceData.getChangeValue() + "\t" +
+					(sDet instanceof SignificanceDetector ? ((SignificanceDetector) sDet).getPValue(sourceData) : "") + "\t", writer);
+
+				FileUtil.write(targetData.getId() + "\t" + targetData.getChangeValue() + "\t" +
+					(tDet instanceof SignificanceDetector ? ((SignificanceDetector) tDet).getPValue(sourceData) : ""), writer);
+			}
+		}));
+		writer.close();
+	}
+
 	public void setCausal(boolean causal)
 	{
 		this.causal = causal ? 1 : -1;
@@ -430,7 +482,7 @@ public class CausalitySearcher implements Cloneable
 		return dataUsedForInference.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
 	}
 
-	public Set<Set<ExperimentData>> getPairsUsedForInference()
+	public Set<List<ExperimentData>> getPairsUsedForInference()
 	{
 		return pairsUsedForInference.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
 	}
@@ -488,5 +540,10 @@ public class CausalitySearcher implements Cloneable
 	public GraphFilter getGraphFilter()
 	{
 		return graphFilter;
+	}
+
+	public void setExpressionEvidence(DataType... types)
+	{
+		expressionEvidence = types;
 	}
 }

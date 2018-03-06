@@ -18,13 +18,13 @@ import java.util.stream.Collectors;
  */
 public class FDRAdjusterForCorrelation
 {
-	Set<Set<ExperimentData>> pairs;
+	Set<List<ExperimentData>> pairs;
 
 	CorrelationDetector cd;
 
 	String directory;
 
-	public FDRAdjusterForCorrelation(String directory, Set<Set<ExperimentData>> pairs, CorrelationDetector cd)
+	public FDRAdjusterForCorrelation(String directory, Set<List<ExperimentData>> pairs, CorrelationDetector cd)
 	{
 		this.directory = directory;
 		this.pairs = pairs;
@@ -35,7 +35,7 @@ public class FDRAdjusterForCorrelation
 	{
 		Map<String, Double> pvals = new HashMap<>();
 
-		for (Set<ExperimentData> pair : pairs)
+		for (List<ExperimentData> pair : pairs)
 		{
 			Iterator<ExperimentData> iter = pair.iterator();
 			ExperimentData data1 = iter.next();
@@ -90,7 +90,7 @@ public class FDRAdjusterForCorrelation
 		// end of debug-----------------------------------------------------------------
 	}
 
-	private String getID(Set<ExperimentData> pair)
+	private String getID(List<ExperimentData> pair)
 	{
 		StringBuilder sb = new StringBuilder();
 		pair.stream().sorted((e1, e2) -> e1.getId().compareTo(e2.getId()))

@@ -74,8 +74,7 @@ public class Relation
 
 	public String toString()
 	{
-		return source + "\t" + type.name + "\t" + target + "\t" + mediators +
-			(sites == null ? "" : "\t" + CollectionUtil.merge(sites, ";"));
+		return source + "\t" + type.name + "\t" + target + "\t" + mediators + "\t" + getSitesInString();
 	}
 
 	public String getMediators()
@@ -96,6 +95,11 @@ public class Relation
 			}
 		}
 		return set;
+	}
+
+	public String getSitesInString()
+	{
+		return sites == null ? "" : CollectionUtil.merge(sites, ";");
 	}
 
 	public Set<ExperimentData> getAllData()

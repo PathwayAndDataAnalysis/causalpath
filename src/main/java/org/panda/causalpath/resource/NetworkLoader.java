@@ -177,10 +177,10 @@ public class NetworkLoader
 			this.description = description;
 		}
 
-		public static Set<ResourceType> getSelectedResources(String s)
+		public static Set<ResourceType> getSelectedResources(Set<String> names)
 		{
 			Set<ResourceType> set = new HashSet<>();
-			for (String res : s.split(",|;|\\s+|\\|"))
+			for (String res : names)
 			{
 				res = res.trim();
 
