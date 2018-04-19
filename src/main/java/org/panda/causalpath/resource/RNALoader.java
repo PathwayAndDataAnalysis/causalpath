@@ -34,9 +34,10 @@ public class RNALoader
 	 */
 	private String[] samples;
 
-	public RNALoader(String filename) throws FileNotFoundException
+	public RNALoader(String filename) throws IOException
 	{
 		reader = new MatrixOfValuesDatasetReader(filename);
+		reader.load(null);
 		Set<String> samples = reader.getSamples();
 		this.samples = samples.toArray(new String[samples.size()]);
 		dataCache = new HashMap<>();
