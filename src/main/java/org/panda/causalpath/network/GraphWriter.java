@@ -222,7 +222,7 @@ public class GraphWriter
 
 			if (data.hasChangeDetector())
 			{
-				if (data.getChangeSign() != 0)
+				if (data.getChangeSign() != 0 || showInsignificantData)
 				{
 					colS = vtc.getColorInString(data.getChangeValue());
 				}
