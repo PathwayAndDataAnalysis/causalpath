@@ -461,7 +461,7 @@ public class CausalitySearcher implements Cloneable
 					(sDet instanceof SignificanceDetector ? ((SignificanceDetector) sDet).getPValue(sourceData) : "") + "\t", writer);
 
 				FileUtil.write(targetData.getId() + "\t" + targetData.getChangeValue() + "\t" +
-					(tDet instanceof SignificanceDetector ? ((SignificanceDetector) tDet).getPValue(sourceData) : ""), writer);
+					(tDet instanceof SignificanceDetector ? ((SignificanceDetector) tDet).getPValue(targetData) : ""), writer);
 			}
 		}));
 		writer.close();

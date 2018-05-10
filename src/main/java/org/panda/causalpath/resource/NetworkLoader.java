@@ -65,6 +65,12 @@ public class NetworkLoader
 			addGraph(allGraphs, SignedType.PHOSPHORYLATES, PhosphoNetworks.get().getGraph());
 		}
 
+		// Add Rho GEF
+		if (resourceTypes.contains(ResourceType.RHOGEF))
+		{
+			addGraph(allGraphs, SignedType.ACTIVATES_GTPASE, RhoGEF.get().getGraph());
+		}
+
 		// Add TRRUST
 		if (resourceTypes.contains(ResourceType.TRRUST))
 		{
@@ -167,6 +173,7 @@ public class NetworkLoader
 		REACH("Network derived from REACH NLP extraction results for phosphorylation relations."),
 		PhosphoNetworks("The PhosphoNetworks database for phosphorylations."),
 		IPTMNet("The IPTMNet database for phosphorylations."),
+		RHOGEF("The experimental Rho - GEF relations."),
 		TRRUST("The TRRUST database for expression relations."),
 		TFactS("The TFactS database for expression relations.");
 

@@ -299,7 +299,7 @@ public class GraphWriter
 				}
 				else
 				{
-					FileUtil.writeln("node\t" + gene + "\trppasite\t" + siteID + "|" + let + "|" + colS + "|" + bor +
+					FileUtil.writeln("node\t" + gene + "\trppasite\t" + siteID.replaceAll("\\|", "-") + "|" + let + "|" + colS + "|" + bor +
 						"|" + val, writer2);
 				}
 			}
