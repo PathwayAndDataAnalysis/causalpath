@@ -71,6 +71,18 @@ public class NetworkLoader
 			addGraph(allGraphs, SignedType.ACTIVATES_GTPASE, RhoGEF.get().getGraph());
 		}
 
+		// Experimental code!!!!!!!!!!!!!!!!!!!
+		if (resourceTypes.contains(ResourceType.PCTCGAConsensus))
+		{
+			DirectedGraph posG = new DirectedGraph("Pos", SignedType.UPREGULATES_EXPRESSION.getTag());
+			DirectedGraph negG = new DirectedGraph("Neg", SignedType.DOWNREGULATES_EXPRESSION.getTag());
+			String file = "/home/babur/Documents/PC/SignedByTCGAConsensusFiltered.sif";
+			posG.load(file, Collections.singleton(posG.getEdgeType()));
+			negG.load(file, Collections.singleton(negG.getEdgeType()));
+			addGraph(allGraphs, SignedType.UPREGULATES_EXPRESSION, posG);
+			addGraph(allGraphs, SignedType.DOWNREGULATES_EXPRESSION, negG);
+		}
+
 		// Add TRRUST
 		if (resourceTypes.contains(ResourceType.TRRUST))
 		{
@@ -174,6 +186,7 @@ public class NetworkLoader
 		PhosphoNetworks("The PhosphoNetworks database for phosphorylations."),
 		IPTMNet("The IPTMNet database for phosphorylations."),
 		RHOGEF("The experimental Rho - GEF relations."),
+		PCTCGAConsensus("Unsigned PC relations whose signs are inferred by TCGA studies"),
 		TRRUST("The TRRUST database for expression relations."),
 		TFactS("The TFactS database for expression relations.");
 

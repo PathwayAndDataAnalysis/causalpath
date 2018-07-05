@@ -28,6 +28,9 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	 */
 	Map<String, Double>[] pvalMaps;
 
+
+	protected double[] significanceThreshold;
+
 	/**
 	 * Constructor with required objects.
 	 * @param relations set of relations to process
@@ -41,15 +44,11 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	@Override
 	public void setFDRThreshold(double fdrThr)
 	{
-		Map<String, Double> pvals = new HashMap<>();
+		significanceThreshold = new double[pvalMaps.length];
 		for (int i = 0; i < pvalMaps.length; i++)
 		{
-			for (String gene : pvalMaps[i].keySet())
-			{
-				pvals.put(gene + "::" + i, pvalMaps[i].get(gene));
-			}
+			significanceThreshold[i] = FDR.getPValueThreshold(pvalMaps[i], null, fdrThr);
 		}
-		setPvalThreshold(FDR.getPValueThreshold(pvals, null, fdrThr));
 	}
 
 	/**
@@ -190,15 +189,31 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	{
 		return pvalMaps[2];
 	}
+	public double getDownstreamActivitySignificanceThreshold()
+	{
+		return significanceThreshold[0];
+	}
+
+	public double getActivatorySignificanceThreshold()
+	{
+		return significanceThreshold[1];
+	}
+
+	public double getInhibitorySignificanceThreshold()
+	{
+		return significanceThreshold[2];
+	}
 
 	public boolean isActivatingTargetsSignificant(String gene)
 	{
-		return getActivatoryPvals().containsKey(gene) && getActivatoryPvals().get(gene) <= significanceThreshold;
+		return getActivatoryPvals().containsKey(gene) &&
+			getActivatoryPvals().get(gene) <= getActivatorySignificanceThreshold();
 	}
 
 	public boolean isInhibitoryTargetsSignificant(String gene)
 	{
-		return getInhibitoryPvals().containsKey(gene) && getInhibitoryPvals().get(gene) <= significanceThreshold;
+		return getInhibitoryPvals().containsKey(gene) &&
+			getInhibitoryPvals().get(gene) <= getInhibitorySignificanceThreshold();
 	}
 
 	/**
@@ -225,8 +240,8 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 		for (String gene : pvalMaps[0].keySet())
 		{
 			Integer i = null;
-			if (pvalMaps[1].get(gene) <= significanceThreshold) i = 1;
-			if (pvalMaps[2].get(gene) <= significanceThreshold)
+			if (getActivatoryPvals().get(gene) <= getActivatorySignificanceThreshold()) i = 1;
+			if (getInhibitoryPvals().get(gene) <= getInhibitorySignificanceThreshold())
 			{
 				i = i == null ? -1 : 0;
 			}

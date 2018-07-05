@@ -576,9 +576,8 @@ public class CausalPath
 			{
 				GeneWithData gene = idToGene.get(id);
 
-				// If there is no data change on the gene, or if there is already an activity data associated with
-				// this gene, skip it
-				if (gene.getChangedData().isEmpty() || !gene.getData(DataType.ACTIVITY).isEmpty()) continue;
+				// If there is already an activity data associated with this gene, skip it
+				if (!gene.getData(DataType.ACTIVITY).isEmpty()) continue;
 
 				if (geneMap.get(id) == 1 || geneMap.get(id) == 0)
 				{
