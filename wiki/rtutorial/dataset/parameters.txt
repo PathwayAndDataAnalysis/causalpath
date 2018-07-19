@@ -9,7 +9,7 @@ threshold-for-data-significance = 0.001 phosphoprotein
 color-saturation-value = 5
 
 calculate-network-significance = true
-permutations-for-significance = 100000
+permutations-for-significance = 1000
 fdr-threshold-for-network-significance = 0.1
 
 gene-activity = EGF a
