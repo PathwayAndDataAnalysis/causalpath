@@ -21,7 +21,7 @@ PDF available here: https://www.biorxiv.org/content/early/2018/02/05/258855
 
 ## Code and Parameter Description 
 
-https://github.com/PathwayAndDataAnalysis/causalpath
+Code repository: https://github.com/PathwayAndDataAnalysis/causalpath
 
 # Background 
 ## Background: Method 
@@ -36,12 +36,16 @@ cat dataset/parameters.txt
 
 ## Run CausalPath 
 
+causalpath.jar available from: https://github.com/PathwayAndDataAnalysis/causalpath/releases
+
 ```{r, engine='bash'}
 java -jar causalpath.jar dataset
 ```
 
 # Result Visualization
 ## Load Libraries 
+
+paxtoolsr Code Repository: https://github.com/BioPAX/paxtoolsr
 
 ```{r}
 library(paxtoolsr)
