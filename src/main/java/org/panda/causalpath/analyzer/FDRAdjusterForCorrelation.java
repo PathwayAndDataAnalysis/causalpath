@@ -56,7 +56,8 @@ public class FDRAdjusterForCorrelation
 		}
 
 		double pThr = FDR.getPValueThreshold(pvals, null, fdrForCorrelation);
-		System.out.println("Correlation p-value thr = " + pThr);
+		System.out.println("Correlation p-value thr is " + pThr + " on " + pvals.size() + " correlations, selecting " +
+			pvals.keySet().stream().filter(k -> pvals.get(k) <= pThr).count());
 
 		cd.setPvalThreshold(pThr);
 
@@ -93,7 +94,7 @@ public class FDRAdjusterForCorrelation
 	private String getID(List<ExperimentData> pair)
 	{
 		StringBuilder sb = new StringBuilder();
-		pair.stream().sorted((e1, e2) -> e1.getId().compareTo(e2.getId()))
+		pair.stream().sorted(Comparator.comparing(ExperimentData::getId))
 			.forEach(e -> sb.append(e.getId()).append(":"));
 		return sb.toString();
 	}

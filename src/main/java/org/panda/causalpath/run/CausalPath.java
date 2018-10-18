@@ -8,6 +8,7 @@ import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationType;
 import org.panda.causalpath.resource.*;
+import org.panda.resource.HGNC;
 import org.panda.resource.ResourceDirectory;
 import org.panda.resource.siteeffect.SiteEffectCollective;
 import org.panda.resource.tcga.ProteomicsFileRow;
@@ -105,6 +106,16 @@ public class CausalPath
 	 * Name of the RNA expression file to load.
 	 */
 	private String rnaExpressionFile;
+
+	/**
+	 * A file for using custom causal priors in the analysis. This is useful for reproducibility.
+	 */
+	private String customCausalPriorsFile;
+
+	/**
+	 * A custom file for the effect of the sites. For reproducibility.
+	 */
+	private String customSiteEffectsFile;
 
 	/**
 	 * A threshold to determine significant changes whenever it applies. This can be a value threshold, or a p-value
@@ -279,7 +290,7 @@ public class CausalPath
 
 	private void readParameters() throws IOException
 	{
-		Files.lines(Paths.get(directory + File.separator + PARAMETER_FILENAME)).filter(l -> !l.trim().startsWith("#"))
+		Files.lines(Paths.get(adjustFileLocation(PARAMETER_FILENAME))).filter(l -> !l.trim().startsWith("#"))
 			.filter(l -> !l.isEmpty())
 			.map(l -> new String[]{l.substring(0, l.indexOf("=")).trim(), l.substring(l.indexOf("=") + 1).trim()})
 			.forEach(t -> setParameter(t[0], t[1]));
@@ -313,7 +324,7 @@ public class CausalPath
 
 		// Read platform file
 		List<ProteomicsFileRow> rows = ProteomicsFileReader.readAnnotation(
-			directory + File.separator + proteomicsPlatformFile,
+			adjustFileLocation(proteomicsPlatformFile),
 			IDColumn, symbolsColumn, sitesColumn, effectColumn);
 
 		// Marking control and test just in case needed.
@@ -339,7 +350,7 @@ public class CausalPath
 		}
 		else vals.addAll(valueColumn);
 
-		ProteomicsFileReader.addValues(rows, directory + File.separator + proteomicsValuesFile,
+		ProteomicsFileReader.addValues(rows, adjustFileLocation(proteomicsValuesFile),
 			IDColumn, vals, defaultMissingValue, doLogTransfrorm);
 
 		// Add activity changes from a tf activity analysis
@@ -350,6 +361,12 @@ public class CausalPath
 
 		// Fill-in missing effects
 		SiteEffectCollective sec = new SiteEffectCollective();
+		if (customSiteEffectsFile != null)
+		{
+			sec.clearEffects();
+			sec.loadCustomEffectsFromFile(adjustFileLocation(customSiteEffectsFile));
+		}
+
 		sec.fillInMissingEffect(rows, siteEffectProximityThreshold);
 
 		ProteomicsLoader loader = new ProteomicsLoader(rows, stDevThresholds);
@@ -357,7 +374,9 @@ public class CausalPath
 //		loader.printStDevHistograms();
 
 		// Load signed relations
-		Set<Relation> relations = networkSelection == null ? NetworkLoader.load() :
+		Set<Relation> relations = customCausalPriorsFile != null ?
+			NetworkLoader.load(adjustFileLocation(customCausalPriorsFile)) :
+			networkSelection == null ? NetworkLoader.load() :
 			NetworkLoader.load(NetworkLoader.ResourceType.getSelectedResources(networkSelection));
 
 		if (cs.getGraphFilter() != null) relations = cs.getGraphFilter().preAnalysisFilter(relations);
@@ -445,21 +464,24 @@ public class CausalPath
 		//---DEBUG
 //		RobustnessAnalysis ra = new RobustnessAnalysis(cs, relations, fdrThresholdForDataSignificance, 0.05,
 //			useCorrelation, fdrThresholdForCorrelation, corrDet);
-//		ra.run(1000, directory + "/robustness.txt");
+//		ra.run(750, directory + "/robustness.txt");
 //		System.exit(0);
 		//---END OF DEBUG
 
 		// Search causal or conflicting relations
 		Set<Relation> causal = cs.run(relations);
 
+		cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/before.txt");
+
 		if (controlFDR)
 		{
 			adjustPvalThresholdToFDR(relations, useCorrelation, corrDet, cs.copy(), cs.getDataUsedForInference(),
 				cs.getPairsUsedForInference(), causal);
 			causal = cs.run(relations);
+			cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/after.txt");
 		}
 
-		cs.writeResults(directory + File.separator + RESULTS_FILENAME);
+		cs.writeResults(adjustFileLocation(RESULTS_FILENAME));
 
 //		loader.printStDevHistograms(cs.getDataUsedForInference());
 
@@ -505,11 +527,11 @@ public class CausalPath
 		}
 
 		// Generate output
-		writer.writeSIFGeneCentric(directory + File.separator + CAUSATIVE_RESULT_FILE_PREFIX);
-		writer.writeJSON(directory + File.separator + CAUSATIVE_RESULT_FILE_PREFIX);
+		writer.writeSIFGeneCentric(adjustFileLocation(CAUSATIVE_RESULT_FILE_PREFIX));
+		writer.writeJSON(adjustFileLocation(CAUSATIVE_RESULT_FILE_PREFIX));
 		if (generateDataCentricGraph)
 		{
-			writer.writeSIFDataCentric(directory + File.separator + CAUSATIVE_RESULT_FILE_DATA_CENTRIC_PREFIX,
+			writer.writeSIFDataCentric(adjustFileLocation(CAUSATIVE_RESULT_FILE_DATA_CENTRIC_PREFIX),
 				cs.getInferenceUnits());
 		}
 
@@ -532,8 +554,8 @@ public class CausalPath
 			writer.setExperimentDataToDraw(cs.getPairsUsedForInference().stream().flatMap(Collection::stream)
 				.collect(Collectors.toSet()));
 		}
-		writer.writeSIFGeneCentric(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
-		writer.writeJSON(directory + File.separator + CONFLICTING_RESULT_FILE_PREFIX);
+		writer.writeSIFGeneCentric(adjustFileLocation(CONFLICTING_RESULT_FILE_PREFIX));
+		writer.writeJSON(adjustFileLocation(CONFLICTING_RESULT_FILE_PREFIX));
 
 		// Report conflict/causal ratio
 		if (causativeSize > 0)
@@ -615,7 +637,7 @@ public class CausalPath
 				nsc = new NSCForNonCorr(relations, cs);
 			}
 
-			String outFile = directory + File.separator + SIGNIFICANCE_FILENAME;
+			String outFile = adjustFileLocation(SIGNIFICANCE_FILENAME);
 
 			if (Files.exists(Paths.get(outFile)))
 			{
@@ -686,7 +708,7 @@ public class CausalPath
 		try
 		{
 			BufferedWriter writer = Files.newBufferedWriter(Paths.get("temp.sif"));
-			rels.forEach(r -> FileUtil.writeln(ArrayUtil.getString("\t", r.source, r.type.name, r.target), writer));
+			rels.forEach(r -> FileUtil.writeln(ArrayUtil.getString("\t", r.source, r.type.getName(), r.target), writer));
 			writer.close();
 		}
 		catch (IOException e)
@@ -706,12 +728,12 @@ public class CausalPath
 			}
 
 			int idLength = opt.get().length();
-			TCGALoader tcga = new TCGALoader(directory + File.separator + tcgaDirectory, idLength);
+			TCGALoader tcga = new TCGALoader(adjustFileLocation(tcgaDirectory), idLength);
 			tcga.setSamples(vals.toArray(new String[vals.size()]));
 
 			if (mutationEffectFilename != null)
 			{
-				tcga.loadMutationEffectMap(directory + File.separator + mutationEffectFilename);
+				tcga.loadMutationEffectMap(adjustFileLocation(mutationEffectFilename));
 			}
 
 			tcga.decorateRelations(relations);
@@ -726,7 +748,7 @@ public class CausalPath
 	{
 		if (rnaExpressionFile != null)
 		{
-			RNALoader loader = new RNALoader(directory + File.separator + rnaExpressionFile);
+			RNALoader loader = new RNALoader(adjustFileLocation(rnaExpressionFile));
 			loader.setSamples(vals.toArray(new String[vals.size()]));
 			loader.decorateRelations(relations);
 			loader.associateChangeDetector(getOneDataChangeDetector(DataType.RNA, ctrl, test, null), data -> data instanceof RNAData);
@@ -757,9 +779,7 @@ public class CausalPath
 	{
 		if (tfActivityFile != null)
 		{
-			if (!tfActivityFile.startsWith("/")) tfActivityFile = directory + "/" + tfActivityFile;
-
-			Files.lines(Paths.get(tfActivityFile)).skip(1).map(l -> l.split("\t")).forEach(t ->
+			Files.lines(Paths.get(adjustFileLocation(tfActivityFile))).skip(1).map(l -> l.split("\t")).forEach(t ->
 			{
 				boolean a = t[1].startsWith("a");
 				ProteomicsFileRow activityRow = new ProteomicsFileRow(t[0] + "-" + (a ? "active-tf" : "inactive-tf"),
@@ -834,11 +854,11 @@ public class CausalPath
 		Set<String> sites = new HashSet<>();
 		for (PhosphoProteinData data : datas)
 		{
-			sites.addAll(data.getGenesWithSites().stream().collect(Collectors.toList()));
+			sites.addAll(data.getGenesWithSites());
 		}
 
 		BufferedWriter writer = Files.newBufferedWriter(
-			Paths.get(directory + File.separator + UNKNOWN_SITE_EFFECT_FILENAME));
+			Paths.get(adjustFileLocation(UNKNOWN_SITE_EFFECT_FILENAME)));
 
 		sites.stream().sorted().forEach(s -> FileUtil.writeln(s, writer));
 
@@ -852,9 +872,9 @@ public class CausalPath
 			.filter(ExperimentData::hasChangeDetector).collect(Collectors.toSet());
 
 		// find the data classes
-		Set<Class<? extends ExperimentData>> classes = datas.stream().map(d -> d.getClass()).collect(Collectors.toSet());
+		Set<Class<? extends ExperimentData>> classes = datas.stream().map(ExperimentData::getClass).collect(Collectors.toSet());
 
-		BufferedWriter writer = Files.newBufferedWriter(Paths.get(directory + File.separator + VALUE_CHANGES_FILENAME));
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get(adjustFileLocation(VALUE_CHANGES_FILENAME)));
 
 		for (Class<? extends ExperimentData> clazz : classes)
 		{
@@ -882,7 +902,7 @@ public class CausalPath
 
 				writer.write("\nRow ID\tChange amount\tP-value\tQ-value");
 				datas.stream().filter(d -> d.getClass().equals(clazz))
-					.sorted((d1, d2) -> pvals.get(d1).compareTo(pvals.get(d2))).forEach(d ->
+					.sorted(Comparator.comparing(pvals::get)).forEach(d ->
 					FileUtil.lnwrite(d.id + "\t" + d.getChangeValue() + "\t" + pvals.get(d) + "\t" + qvals.get(d),
 						writer));
 			}
@@ -895,6 +915,28 @@ public class CausalPath
 		}
 
 		writer.close();
+	}
+
+	/**
+	 * Loads HGNC symbols if provided as a file. This is good for reproducibility.
+	 * @param file name of the file
+	 */
+	private void loadHGNC(String file)
+	{
+		try
+		{
+			HGNC.get().load(Files.lines(Paths.get(adjustFileLocation(file))));
+		}
+		catch (IOException e)
+		{
+			throw new RuntimeException(e);
+		}
+	}
+
+	private String adjustFileLocation(String file)
+	{
+		if (file.startsWith(File.separator)) return file;
+		return directory + File.separator + file;
 	}
 
 	/**
@@ -1394,6 +1436,18 @@ public class CausalPath
 				"Firehose, and provide the directory here. The org.panda.resource.tcga.BroadDownloader in the project" +
 				" https://github.com/PathwayAndDataAnalysis/resource is a utility that can do that.",
 			new EntryType(String.class), null, false, false, new Cond(Logical.NOT)),
+		HGNC_FILE((value, cp) -> cp.loadHGNC(value),
+			"HGNC data file",
+			"For reproducibility: Provide an HGNC resource file to reproduce a previous analysis.",
+			new EntryType(String.class), null, false, false, new Cond(Logical.NOT)),
+		CUSTOM_CAUSAL_PRIORS_FILE((value, cp) -> cp.customCausalPriorsFile = value,
+			"Custom causal priors file",
+			"For reproducibility: Provide a custom file for causal priors.",
+			new EntryType(File.class), null, false, false, new Cond(Logical.NOT)),
+		CUSTOM_SITE_EFFECTS_FILE((value, cp) -> cp.customSiteEffectsFile = value,
+			"Custom site effects file",
+			"For reproducibility: Provide a custom file for site effects.",
+			new EntryType(File.class), null, false, false, new Cond(Logical.NOT)),
 		;
 
 		ParameterReader reader;

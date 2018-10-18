@@ -351,7 +351,7 @@ public class GraphWriter
 			{
 				for (ExperimentData target : targets)
 				{
-					FileUtil.writeln(source.getId() + "\t" + r.type.name + "\t" + target.getId(), writer1);
+					FileUtil.writeln(source.getId() + "\t" + r.type.getName() + "\t" + target.getId(), writer1);
 					used.add(source);
 					used.add(target);
 				}
@@ -396,7 +396,7 @@ public class GraphWriter
 
 		relations.forEach(rel ->
 		{
-			String key = rel.source + "\t" + rel.type.name + "\t" + rel.target;
+			String key = rel.source + "\t" + rel.type.getName() + "\t" + rel.target;
 			if (relMem.contains(key)) return;
 			else relMem.add(key);
 
@@ -406,7 +406,7 @@ public class GraphWriter
 			edge.put("data", dMap);
 			dMap.put("source", rel.source);
 			dMap.put("target", rel.target);
-			dMap.put("edgeType", rel.type.name);
+			dMap.put("edgeType", rel.type.getName());
 			dMap.put("tooltipText", CollectionUtil.merge(rel.getTargetWithSites(0), ", "));
 
 			if (rel.getMediators() != null)

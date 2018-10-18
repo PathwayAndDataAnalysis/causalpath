@@ -5,16 +5,16 @@ package org.panda.causalpath.network;
  */
 public enum RelationType
 {
-	UPREGULATES_EXPRESSION("upregulates-expression", 1, false, true, false),
-	DOWNREGULATES_EXPRESSION("downregulates-expression", -1, false, true, false),
-	PHOSPHORYLATES("phosphorylates", 1, true, false, false),
-	DEPHOSPHORYLATES("dephosphorylates", -1, true, false, false),
+	UPREGULATES_EXPRESSION(1, false, true, false),
+	DOWNREGULATES_EXPRESSION(-1, false, true, false),
+	PHOSPHORYLATES(1, true, false, false),
+	DEPHOSPHORYLATES(-1, true, false, false),
 
 	// This means source is a GEF that separates GDP from inactive GTPase protein.
-	ACTIVATES_GTPASE("activates-gtpase", 1, false, false, true),
+	ACTIVATES_GTPASE(1, false, false, true),
 
 	// This means source is a GAP that activates GTP hydrolysis function of the GTPase, which makes GTPase inactive.
-	INHIBITS_GTPASE("inhibits-gtpase", -1, false, false, true);
+	INHIBITS_GTPASE(-1, false, false, true);
 
 	/**
 	 * Whether the relation can explain a change in phosphorylation.
@@ -36,17 +36,28 @@ public enum RelationType
 	 */
 	public int sign;
 
-	/**
-	 * The name of the relation will be used in the generated SIF graph.
-	 */
-	public String name;
-
-	RelationType(String name, int sign, boolean affectsPhosphoSite, boolean affectsTotalProt, boolean affectsGTPase)
+	RelationType(int sign, boolean affectsPhosphoSite, boolean affectsTotalProt, boolean affectsGTPase)
 	{
-		this.name = name;
 		this.sign = sign;
 		this.affectsPhosphoSite = affectsPhosphoSite;
 		this.affectsTotalProt = affectsTotalProt;
 		this.affectsGTPase = affectsGTPase;
+	}
+
+	public String getName()
+	{
+		return toString().toLowerCase().replaceAll("_", "-");
+	}
+
+	public static RelationType getType(String name)
+	{
+		try
+		{
+			return valueOf(name.toUpperCase().replaceAll("-", "_"));
+		}
+		catch (Exception e)
+		{
+			return null;
+		}
 	}
 }

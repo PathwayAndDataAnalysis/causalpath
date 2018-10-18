@@ -232,15 +232,20 @@ public class CausalitySearcher implements Cloneable
 	 */
 	private boolean satisfiesCriteria(Set<ExperimentData> sd, Relation rel, Set<ExperimentData> td)
 	{
+		boolean satisfies = false;
+
 		for (ExperimentData sourceData : sd)
 		{
 			for (ExperimentData targetData : td)
 			{
-				if (satisfiesCriteria(rel, sourceData, targetData)) return true;
+				if (satisfiesCriteria(rel, sourceData, targetData))
+				{
+					satisfies = true;
+				}
 			}
 		}
 
-		return false;
+		return satisfies;
 	}
 
 	/**
@@ -417,7 +422,7 @@ public class CausalitySearcher implements Cloneable
 		{
 			Optional<ProteinData> opt = data.stream().filter(d -> d instanceof ProteinData && d.getEffect() != 0)
 				.map(d -> (ProteinData) d).sorted((d1, d2) ->
-					Double.valueOf(Math.abs(d2.getChangeValue())).compareTo(Math.abs(d1.getChangeValue()))).findFirst();
+					Double.compare(Math.abs(d2.getChangeValue()), Math.abs(d1.getChangeValue()))).findFirst();
 
 			if (opt.isPresent())
 			{
@@ -445,7 +450,7 @@ public class CausalitySearcher implements Cloneable
 			ExperimentData sourceData = iter.next();
 			ExperimentData targetData = iter.next();
 
-			FileUtil.lnwrite(r.source + "\t" + r.type.name + "\t" + r.target + "\t" + r.getSitesInString() + "\t", writer);
+			FileUtil.lnwrite(r.source + "\t" + r.type.getName() + "\t" + r.target + "\t" + r.getSitesInString() + "\t", writer);
 
 			if (corDet != null)
 			{
@@ -486,6 +491,46 @@ public class CausalitySearcher implements Cloneable
 	{
 		return pairsUsedForInference.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
 	}
+
+	//--DEBUG----------
+	public void writePairsUsedForInferenceWithCorrelations(String file)
+	{
+		try
+		{
+			BufferedWriter writer = Files.newBufferedWriter(Paths.get(file));
+			Set<List<ExperimentData>> pairs = getPairsUsedForInference();
+
+			CorrelationDetector cd = new CorrelationDetector(-1, 1);
+			Map<String, Double> pvals = new HashMap<>();
+
+			for (List<ExperimentData> pair : pairs)
+			{
+				Iterator<ExperimentData> iter = pair.iterator();
+				ExperimentData data1 = iter.next();
+				ExperimentData data2 = iter.next();
+
+				Tuple corr = cd.calcCorrelation(data1, data2);
+				if (!corr.isNaN())
+				{
+					StringBuilder sb = new StringBuilder();
+					pair.stream().sorted(Comparator.comparing(ExperimentData::getId))
+						.forEach(e -> sb.append(e.getId()).append(":"));
+					String id = sb.toString();
+
+					pvals.put(id, corr.p);
+				}
+			}
+
+			pvals.forEach((s, p) -> FileUtil.writeln(s + "\t" + p, writer));
+
+			writer.close();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+	//--DEBUG----------
 
 	public Map<Relation, Set<ExperimentData>> getInferenceUnits()
 	{

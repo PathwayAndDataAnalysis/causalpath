@@ -31,6 +31,11 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 	Map<String, Double> pvals;
 
 	/**
+	 * If this parameter is set, this class can record the null distribution of network sizes.
+	 */
+	private String fileToWriteNullDistVals;
+
+	/**
 	 * Constructor with the network.
 	 */
 	public NSCForCorrelation(Set<Relation> relations, CausalitySearcher cs)
@@ -123,11 +128,31 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 			prog.tick();
 		}
 
+		if (fileToWriteNullDistVals != null)
+		{
+			try
+			{
+				BufferedWriter writer = Files.newBufferedWriter(Paths.get(fileToWriteNullDistVals));
+				writer.write("Actual graph size\n" + sizeCurrent + "\n\nNull distribution");
+				for (double size : sizes)
+				{
+					writer.write("\n" + size);
+				}
+				writer.close();
+			}
+			catch (IOException e)
+			{
+				e.printStackTrace();
+			}
+		}
+
+		//----- DEBUG------------------------------
 		// Plot graph size significance
-		Map<String, double[]> map = new HashMap<>();
-		map.put(ArrayUtil.mean(sizes) + " (mean of random)", sizes);
-		map.put(sizeCurrent + " (actual)", new double[]{sizeCurrent});
-		KernelDensityPlot.plot("Graph size distribution", map);
+//		Map<String, double[]> map = new HashMap<>();
+//		map.put(ArrayUtil.mean(sizes) + " (mean of random)", sizes);
+//		map.put(sizeCurrent + " (actual)", new double[]{sizeCurrent});
+//		KernelDensityPlot.plot("Graph size distribution", map);
+		//----- DEBUG------------------------------
 
 		// Convert counts to p-values
 
