@@ -3,6 +3,7 @@ package org.panda.causalpath.data;
 import org.panda.causalpath.analyzer.OneDataChangeDetector;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -35,6 +36,11 @@ public abstract class ExperimentData
 	 * or can decide based on a threshold, etc.
 	 */
 	protected OneDataChangeDetector chDet;
+
+	/**
+	 * Repeat of the same experiments, if available.
+	 */
+	protected Set<ExperimentData> repeatData;
 
 	public ExperimentData(String id, Set<String> geneSymbols)
 	{
@@ -123,5 +129,21 @@ public abstract class ExperimentData
 	public String toString()
 	{
 		return id;
+	}
+
+	public void addRepeatData(ExperimentData data)
+	{
+		if (this.repeatData == null) this.repeatData = new HashSet<>();
+		this.repeatData.add(data);
+	}
+
+	public boolean hasRepeatData()
+	{
+		return this.repeatData != null && !this.repeatData.isEmpty();
+	}
+
+	public Set<ExperimentData> getRepeatData()
+	{
+		return repeatData;
 	}
 }

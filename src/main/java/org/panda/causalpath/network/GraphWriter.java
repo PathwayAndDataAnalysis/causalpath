@@ -261,7 +261,7 @@ public class GraphWriter
 			}
 			else if (data instanceof ActivityData)
 			{
-				let = "a";
+				let = data.getChangeSign() > 0 ? "a" : "i";
 				bor = inString(activatingBorderColor);
 			}
 
@@ -468,7 +468,7 @@ public class GraphWriter
 			}
 			else if (data instanceof ActivityData)
 			{
-				let = "a";
+				let = data.getChangeSign() > 0 ? "a" : "i";
 				bor = inJSONString(activatingBorderColor);
 			}
 

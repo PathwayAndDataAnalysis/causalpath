@@ -2,17 +2,12 @@ package org.panda.causalpath.analyzer;
 
 import org.panda.causalpath.data.*;
 import org.panda.utility.ArrayUtil;
-import org.panda.utility.BooleanMatrixRandomizer;
 import org.panda.utility.RandomizedMatrices;
 import org.panda.utility.Tuple;
-import org.panda.utility.statistics.ChiSquare;
-import org.panda.utility.statistics.GTest;
-import org.panda.utility.statistics.TTest;
+import org.panda.utility.statistics.*;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Checks the significance of separation of control and test groups.
@@ -23,6 +18,8 @@ public class SignificanceDetector extends DifferenceDetector
 	protected boolean useMissingData;
 	protected double categDataSufficiencyThreshold;
 
+	protected boolean paired;
+
 	RandomMatrixUser rmu;
 
 	public SignificanceDetector(double threshold, boolean[] control, boolean[] test)
@@ -30,6 +27,12 @@ public class SignificanceDetector extends DifferenceDetector
 		super(threshold, control, test);
 		useMissingData = false;
 		minimumSampleSize = 0;
+		paired = false;
+	}
+
+	public void setPaired(boolean paired)
+	{
+		this.paired = paired;
 	}
 
 	public void setUseMissingData(boolean useMissingData)
@@ -81,7 +84,58 @@ public class SignificanceDetector extends DifferenceDetector
 		return tup1;
 	}
 
+	/**
+	 * Compares controls and tests. Considers independent repeats and merges their p-values using Fisher's combined
+	 * probability.
+	 *
+	 * @param data data to test
+	 * @return significance
+	 */
 	public Tuple testDataNaive(ExperimentData data)
+	{
+		if (data.hasRepeatData())
+		{
+			List<Tuple> list = new ArrayList<>();
+			Tuple t = testDataNaiveOnSingleData(data);
+			if (!t.isNaN()) list.add(t);
+
+			for (ExperimentData repData : data.getRepeatData())
+			{
+				t = testDataNaiveOnSingleData(repData);
+				if (!t.isNaN()) list.add(t);
+			}
+
+			if (list.isEmpty()) return new Tuple();
+			if (list.size() == 1) return list.get(0);
+
+			double[] p = new double[list.size()];
+			int[] s = new int[list.size()];
+			double[] v = new double[list.size()];
+
+			for (int i = 0; i < list.size(); i++)
+			{
+				t = list.get(i);
+				p[i] = t.p;
+				v[i] = t.v;
+				s[i] = Math.signum(v[i]) == Math.signum(v[0]) ? -1 : 1;
+			}
+
+			// Get the combined signed p-value
+			double[] sP = StouffersCombinedProbability.combineP2Tailed(p, s);
+
+			double pC = sP[0];
+			double vC = Summary.mean(v);
+			if (Math.signum(s[0]) != Math.signum(sP[1]) && Math.signum(v[0]) == Math.signum(vC))
+			{
+				vC = -vC;
+			}
+
+			return new Tuple(vC, pC);
+		}
+		else return testDataNaiveOnSingleData(data);
+	}
+
+	public Tuple testDataNaiveOnSingleData(ExperimentData data)
 	{
 		if (data instanceof NumericData)
 		{
@@ -96,7 +150,7 @@ public class SignificanceDetector extends DifferenceDetector
 
 			if (testVals.length >= minimumSampleSize && ctrlVals.length >= minimumSampleSize)
 			{
-				Tuple ttest = TTest.test(testVals, ctrlVals);
+				Tuple ttest = paired ? TTest.testPaired(ctrlVals, testVals) : TTest.test(ctrlVals, testVals);
 				p = ttest.p;
 				sign = Math.signum(ttest.v);
 			}

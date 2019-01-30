@@ -62,6 +62,11 @@ public class CausalPath
 	private String proteomicsValuesFile;
 
 	/**
+	 * If there is a repeat proteomic experiment, CausalPath can use them to gain statistical power.
+	 */
+	private List<String> proteomicsRepeatValuesFiles;
+
+	/**
 	 * Name of the column that contains IDs. This name have to be the same in both the platform and the values files.
 	 */
 	private String IDColumn;
@@ -322,16 +327,10 @@ public class CausalPath
 		// If there is no platform file, use the values file instead.
 		if (proteomicsPlatformFile == null) proteomicsPlatformFile = proteomicsValuesFile;
 
-		// Read platform file
-		List<ProteomicsFileRow> rows = ProteomicsFileReader.readAnnotation(
-			adjustFileLocation(proteomicsPlatformFile),
-			IDColumn, symbolsColumn, sitesColumn, effectColumn);
-
 		// Marking control and test just in case needed.
 		boolean[] ctrl = null;
 		boolean[] test = null;
 
-		// Read values
 		List<String> vals = new ArrayList<>();
 		if (transformation.isTwoGroupComparison())
 		{
@@ -350,6 +349,12 @@ public class CausalPath
 		}
 		else vals.addAll(valueColumn);
 
+		// Read platform file
+		List<ProteomicsFileRow> rows = ProteomicsFileReader.readAnnotation(
+			adjustFileLocation(proteomicsPlatformFile),
+			IDColumn, symbolsColumn, sitesColumn, effectColumn);
+
+		// Read values
 		ProteomicsFileReader.addValues(rows, adjustFileLocation(proteomicsValuesFile),
 			IDColumn, vals, defaultMissingValue, doLogTransfrorm);
 
@@ -370,6 +375,27 @@ public class CausalPath
 		sec.fillInMissingEffect(rows, siteEffectProximityThreshold);
 
 		ProteomicsLoader loader = new ProteomicsLoader(rows, stDevThresholds);
+
+		if (proteomicsRepeatValuesFiles != null)
+		{
+			boolean noPlatform = proteomicsPlatformFile.equals(proteomicsValuesFile);
+
+			for (String file : proteomicsRepeatValuesFiles)
+			{
+				// Read platform file
+				rows = ProteomicsFileReader.readAnnotation(
+					adjustFileLocation(noPlatform ? file : proteomicsPlatformFile),
+					IDColumn, symbolsColumn, sitesColumn, effectColumn);
+
+				// Read values
+				ProteomicsFileReader.addValues(rows, adjustFileLocation(file),
+					IDColumn, vals, defaultMissingValue, doLogTransfrorm);
+
+				ensureProteomicIDUniqueness(rows);
+				loader.addRepeatData(rows, stDevThresholds);
+			}
+		}
+
 		if (testMissingValues) loader.initMissingDataForProteins();
 //		loader.printStDevHistograms();
 
@@ -392,7 +418,9 @@ public class CausalPath
 
 		// Mark some decisions
 		boolean useCorrelation = transformation == ValueTransformation.CORRELATION;
-		boolean controlFDR = (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN && fdrThresholdForDataSignificance != null) ||
+		boolean controlFDR = ((transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN ||
+			transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED) &&
+			fdrThresholdForDataSignificance != null) ||
 			(transformation == ValueTransformation.CORRELATION && fdrThresholdForCorrelation > 0);
 
 		Set<String> dataIDs = null;
@@ -471,14 +499,14 @@ public class CausalPath
 		// Search causal or conflicting relations
 		Set<Relation> causal = cs.run(relations);
 
-		cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/before.txt");
+//		cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/before.txt");
 
 		if (controlFDR)
 		{
 			adjustPvalThresholdToFDR(relations, useCorrelation, corrDet, cs.copy(), cs.getDataUsedForInference(),
 				cs.getPairsUsedForInference(), causal);
 			causal = cs.run(relations);
-			cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/after.txt");
+//			cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/after.txt");
 		}
 
 		cs.writeResults(adjustFileLocation(RESULTS_FILENAME));
@@ -567,6 +595,30 @@ public class CausalPath
 		PropagationAccuracyPredictor pred = new PropagationAccuracyPredictor();
 		double accuracy = pred.run(causal, conflicting, cs.copy());
 		System.out.println("hypothetical propagation accuracy = " + accuracy);
+	}
+
+	private void ensureProteomicIDUniqueness(List<ProteomicsFileRow> rows)
+	{
+		Map<String, ProteomicsFileRow> map = new HashMap<>();
+		for (ProteomicsFileRow row : rows)
+		{
+			if (map.containsKey(row.id))
+			{
+				ProteomicsFileRow prev = map.get(row.id);
+
+				double sd1 = prev.getStDev();
+				double sd2 = row.getStDev();
+
+				if (sd2 > sd1)
+				{
+					map.put(row.id, row);
+				}
+			}
+			else map.put(row.id, row);
+		}
+
+		rows.clear();
+		rows.addAll(map.values());
 	}
 
 	private boolean hasThresholdFor(DataType type)
@@ -811,12 +863,18 @@ public class CausalPath
 		{
 			detector = new FoldChangeDetector(thresholdForDataSignificance.get(type), ctrl, test);
 		}
-		else if (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN)
+		else if (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN ||
+			transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED)
 		{
 			// if there is no fdr control, then use the given data significance threshold. Otherwise use 1, which means
 			// make everything significant. And FDR correction will be applied later.
 			detector = new SignificanceDetector(fdrThresholdForDataSignificance == null ?
 				thresholdForDataSignificance.get(type) : 1, ctrl, test);
+
+			if (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED)
+			{
+				((SignificanceDetector) detector).setPaired(true);
+			}
 
 			if (type == DataType.PROTEIN || type == DataType.PHOSPHOPROTEIN)
 			{
@@ -978,6 +1036,15 @@ public class CausalPath
 			"alternatively, fdr-threshold-for-data-significance should be used for " +
 			"controlling significance at the false discovery rate level.", true),
 
+		SIGNIFICANT_CHANGE_OF_MEAN_PAIRED("significant-change-of-mean-paired", "There should be sufficient amount of " +
+			"control and test values to detect the significance of change with a paired t-test. Technically there " +
+			"should be more than 3 controls and 3 tests, practically, they should be much more to provide statistical" +
+			" power. The order of control and test value columns indicate the pairing. First control column in the " +
+			"parameters file is paired with first test column, second is paired with second, etc. The " +
+			"threshold-for-data-significance should be used for a p-value threshold, or alternatively, " +
+			"fdr-threshold-for-data-significance should be used for controlling significance at the false discovery " +
+			"rate level.", true),
+
 		CORRELATION("correlation", "There should be one group of values (marked with value-column). There must be at " +
 			"least 3 value columns technically, but many more " +
 			"than that practically to have some statistical power for significant correlation. ", false);
@@ -1043,6 +1110,16 @@ public class CausalPath
 			"Name of the proteomics values file. It should have at least one ID column and one or more columns for " +
 				"experiment values. Platform file and values file can be the same file.",
 			new EntryType(File.class), null, true, false, null),
+		PROTEOMICS_REPEAT_VALUES_FILE((value, cp) ->
+		{
+			if (cp.proteomicsRepeatValuesFiles == null) cp.proteomicsRepeatValuesFiles = new ArrayList<>();
+			cp.proteomicsRepeatValuesFiles.add(value);
+		},
+			"Proteomics repeat values file",
+			"Name of the proteomics values file for the repeated experiment, if exists. This file has to have the " +
+				"exact same columns with the original proteomic values file, in the same order. Row IDs have to match" +
+				" with the corresponding row in the original data.",
+			new EntryType(File.class), null, true, false, null),
 		PROTEOMICS_PLATFORM_FILE((value, cp) -> cp.proteomicsPlatformFile = value,
 			"Proteomics platform file",
 			"Name of the proteomics platform file. Each row should belong to either a gene's total protein " +
@@ -1065,7 +1142,14 @@ public class CausalPath
 			"Site effect column in data file",
 			"The name of the effect column.",
 			new EntryType(String.class), new String[][]{{"Effect"}}, false, false, null),
-		VALUE_TRANSFORMATION((value, cp) -> cp.transformation = ValueTransformation.fetch(value),
+		VALUE_TRANSFORMATION((value, cp) ->
+		{
+			cp.transformation = ValueTransformation.fetch(value);
+			if (cp.transformation == null)
+			{
+				throw new RuntimeException("Value transformation \"" + value + "\" not recognized.");
+			}
+		},
 			"How to use values in the analysis",
 			"This parameter determines how to use the values in the proteomics file. Options are listed below. When " +
 				"there is only one value column and no transformation is desired, users can select any of the first 3" +
@@ -1098,7 +1182,8 @@ public class CausalPath
 			new Cond(Logical.OR,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.DIFFERENCE_OF_MEANS.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.FOLD_CHANGE_OF_MEAN.name),
-				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name))),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name))),
 		TEST_VALUE_COLUMN((value, cp) ->
 		{
 			if (cp.testValueColumn == null) cp.testValueColumn = new ArrayList<>();
@@ -1111,7 +1196,8 @@ public class CausalPath
 			new Cond(Logical.OR,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.DIFFERENCE_OF_MEANS.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.FOLD_CHANGE_OF_MEAN.name),
-				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name))),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name))),
 		DO_LOG_TRANSFORM((value, cp) -> cp.doLogTransfrorm = Boolean.valueOf(value),
 			"Log transform data values",
 			"Whether the proteomic values should be log transformed for the analysis. Possible values are 'true' and " +
@@ -1149,7 +1235,9 @@ public class CausalPath
 				"'0.1 phosphoprotein' or '0.05 protein.",
 			new EntryType(Double.class, DataType.class), null, false, true,
 			new Cond(Logical.AND,
-				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
+				new Cond(Logical.OR,
+					new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
+					new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name)),
 				new Cond(THRESHOLD_FOR_DATA_SIGNIFICANCE.getText(), null))),
 		POOL_PROTEOMICS_FOR_FDR_ADJUSTMENT((value, cp) -> cp.poolProteomicsForFDRAdjustment = Boolean.valueOf(value),
 			"Pool proteomics data for FDR adjustment",
@@ -1201,7 +1289,8 @@ public class CausalPath
 			new EntryType(Double.class, DataType.class), null, false, true,
 			new Cond(Logical.OR,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
-				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name))),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name))),
 		DEFAULT_MISSING_VALUE((value, cp) -> cp.defaultMissingValue = Double.valueOf(value),
 			"Default missing value in proteomics file",
 			"An option to specify a default value for the missing values in the proteomics file.",
@@ -1213,7 +1302,8 @@ public class CausalPath
 			new EntryType(Integer.class), new String[][]{{"3"}}, true, false,
 			new Cond(Logical.OR,
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
-				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name))),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name))),
 		CALCULATE_NETWORK_SIGNIFICANCE((value, cp) -> cp.calculateNetworkSignificance = Boolean.valueOf(value),
 			"Calculate network significance",
 			"Whether to calculate significances of the properties of the graph. When turned on, a p-value for network" +

@@ -53,8 +53,63 @@ public class ProteomicsLoader
 			for (String sym : ed.getGeneSymbols())
 			{
 				if (!dataMap.containsKey(sym)) dataMap.put(sym, new HashSet<>());
+
+				// check if there is already some data with the same ID
+				for (ExperimentData data : dataMap.get(sym))
+				{
+					if (data.getId().equals(ed.getId()))
+					{
+						throw new RuntimeException("Proteomic data has non-unique IDs: " + ed.getId());
+					}
+				}
+
 				dataMap.get(sym).add(ed);
 				datas.add(ed);
+			}
+		});
+	}
+
+	public void addRepeatData(Collection<ProteomicsFileRow> rows, Map<DataType, Double> stdevThresholds)
+	{
+		rows.stream().distinct().forEach(r ->
+		{
+			ExperimentData ed = r.isActivity() ? new ActivityData(r) :
+				r.isPhospho() ? new PhosphoProteinData(r) : new ProteinData(r);
+
+			if (stdevThresholds != null && ed instanceof NumericData)
+			{
+				DataType type = ed.getType();
+				Double thr = stdevThresholds.get(type);
+				if (thr != null)
+				{
+					double sd = Summary.stdev(((NumericData) ed).vals);
+					if (Double.isNaN(sd) || sd < thr) return;
+				}
+			}
+
+			for (String sym : ed.getGeneSymbols())
+			{
+				if (!dataMap.containsKey(sym)) dataMap.put(sym, new HashSet<>());
+
+				ExperimentData orig = null;
+				for (ExperimentData data : dataMap.get(sym))
+				{
+					if (data.getId().equals(ed.getId()))
+					{
+						orig = data;
+						break;
+					}
+				}
+
+				if (orig != null)
+				{
+					orig.addRepeatData(ed);
+				}
+				else
+				{
+					dataMap.get(sym).add(ed);
+					datas.add(ed);
+				}
 			}
 		});
 	}

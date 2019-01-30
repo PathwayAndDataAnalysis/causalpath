@@ -65,6 +65,12 @@ public class NetworkLoader
 			addGraph(allGraphs, SignedType.PHOSPHORYLATES, PhosphoNetworks.get().getGraph());
 		}
 
+		// Add NetworKIN
+		if (resourceTypes.contains(ResourceType.NetworKIN))
+		{
+			addGraph(allGraphs, SignedType.PHOSPHORYLATES, NetworKIN.get().getGraph());
+		}
+
 		// Add Rho GEF
 		if (resourceTypes.contains(ResourceType.RHOGEF))
 		{
@@ -200,7 +206,9 @@ public class NetworkLoader
 		RHOGEF("The experimental Rho - GEF relations."),
 		PCTCGAConsensus("Unsigned PC relations whose signs are inferred by TCGA studies"),
 		TRRUST("The TRRUST database for expression relations."),
-		TFactS("The TFactS database for expression relations.");
+		TFactS("The TFactS database for expression relations."),
+		NetworKIN("The NetworKIN database for phosphorylation relations."),
+		;
 
 		String description;
 
