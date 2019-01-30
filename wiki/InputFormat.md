@@ -9,7 +9,7 @@ Users need to prepare a minimum of 2 text files to run a CausalPath analysis.
 
 CausalPath reads the proteomics dataset from a tab-delimited text file where the first row contains the column headers. Below are description of those columns.
 
-**ID:** A unique text identifier for each row in the dataset. Ideally, it is better if the ID contains the gene symbols and modification sites if applicable. Those IDs are displayed in the tooltip text of related network parts by visualization software.
+**ID:** A unique text identifier for each row in the dataset. Ideally, it is better if the ID contains the gene symbols and modification sites if applicable. Those IDs are displayed in the tooltip text of related network parts by visualization software. Make sure that IDs do not contain the characters "|" and "@". Otherwise ChiBE won't be able to display them.
 
 **Symbols:** HGNC symbol of the related gene. If there are more than one gene symbol reltaed to this row, there should be a single space between each symbol.
 
