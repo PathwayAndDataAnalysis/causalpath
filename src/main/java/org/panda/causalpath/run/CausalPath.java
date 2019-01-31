@@ -10,6 +10,8 @@ import org.panda.causalpath.network.RelationType;
 import org.panda.causalpath.resource.*;
 import org.panda.resource.HGNC;
 import org.panda.resource.ResourceDirectory;
+import org.panda.resource.siteeffect.PhosphoSitePlus;
+import org.panda.resource.siteeffect.Signor;
 import org.panda.resource.siteeffect.SiteEffectCollective;
 import org.panda.resource.tcga.ProteomicsFileRow;
 import org.panda.utility.ArrayUtil;
@@ -116,11 +118,6 @@ public class CausalPath
 	 * A file for using custom causal priors in the analysis. This is useful for reproducibility.
 	 */
 	private String customCausalPriorsFile;
-
-	/**
-	 * A custom file for the effect of the sites. For reproducibility.
-	 */
-	private String customSiteEffectsFile;
 
 	/**
 	 * A threshold to determine significant changes whenever it applies. This can be a value threshold, or a p-value
@@ -366,11 +363,6 @@ public class CausalPath
 
 		// Fill-in missing effects
 		SiteEffectCollective sec = new SiteEffectCollective();
-		if (customSiteEffectsFile != null)
-		{
-			sec.clearEffects();
-			sec.loadCustomEffectsFromFile(adjustFileLocation(customSiteEffectsFile));
-		}
 
 		sec.fillInMissingEffect(rows, siteEffectProximityThreshold);
 
@@ -983,13 +975,31 @@ public class CausalPath
 	{
 		try
 		{
-			HGNC.get().load(Files.lines(Paths.get(adjustFileLocation(file))));
+			HGNC.initSingletonWith(Files.lines(Paths.get(adjustFileLocation(file))));
 		}
 		catch (IOException e)
 		{
 			throw new RuntimeException(e);
 		}
 	}
+
+	/**
+	 * Loads site effects if provided as a file. This is good for reproducibility.
+	 * @param file name of the file
+	 */
+	private void loadSiteEffectServers(String file)
+	{
+		try
+		{
+			PhosphoSitePlus.initSingletonWith(Files.lines(Paths.get(adjustFileLocation(file))));
+			Signor.initSingletonEmpty();
+		}
+		catch (IOException e)
+		{
+			throw new RuntimeException(e);
+		}
+	}
+
 
 	private String adjustFileLocation(String file)
 	{
@@ -1534,7 +1544,7 @@ public class CausalPath
 			"Custom causal priors file",
 			"For reproducibility: Provide a custom file for causal priors.",
 			new EntryType(File.class), null, false, false, new Cond(Logical.NOT)),
-		CUSTOM_SITE_EFFECTS_FILE((value, cp) -> cp.customSiteEffectsFile = value,
+		CUSTOM_SITE_EFFECTS_FILE((value, cp) -> cp.loadSiteEffectServers(value),
 			"Custom site effects file",
 			"For reproducibility: Provide a custom file for site effects.",
 			new EntryType(File.class), null, false, false, new Cond(Logical.NOT)),
