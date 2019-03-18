@@ -591,4 +591,13 @@ public class CausalitySearcher implements Cloneable
 	{
 		expressionEvidence = types;
 	}
+
+	/**
+	 * This method is experimental, only to test how good is RNA expression as a proxy to protein activity. It is not
+	 * meant to be used in a regular CausalPath analysis.
+	 */
+	public void useExpressionForActivity()
+	{
+		this.generalActivityChangeIndicators = new HashSet<>(Collections.singletonList(DataType.RNA));
+	}
 }

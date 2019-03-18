@@ -643,7 +643,7 @@ public class CausalPath
 				GeneWithData gene = idToGene.get(id);
 
 				// If there is already an activity data associated with this gene, skip it
-				if (!gene.getData(DataType.ACTIVITY).isEmpty()) continue;
+//				if (!gene.getData(DataType.ACTIVITY).isEmpty()) continue;
 
 				if (geneMap.get(id) == 1 || geneMap.get(id) == 0)
 				{
@@ -1548,6 +1548,13 @@ public class CausalPath
 			"Custom site effects file",
 			"For reproducibility: Provide a custom file for site effects.",
 			new EntryType(File.class), null, false, false, new Cond(Logical.NOT)),
+		USE_EXPRESSION_FOR_ACTIVITY_EVIDENCE((value, cp) ->
+		{
+			if (Boolean.valueOf(value)) cp.cs.useExpressionForActivity();
+		},
+			"Experimental parameter",
+			"For testing if RNA expression is a good proxy for protein activity.",
+			new EntryType(Boolean.class), null, false, false, new Cond(Logical.NOT)),
 		;
 
 		ParameterReader reader;

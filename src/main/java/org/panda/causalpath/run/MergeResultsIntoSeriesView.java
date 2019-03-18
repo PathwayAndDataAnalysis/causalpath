@@ -199,7 +199,7 @@ public class MergeResultsIntoSeriesView
 
 	public static void main(String[] args) throws IOException
 	{
-		run("/home/ozgun/Data/LINCS/PBS",
+		run("/home/ozgun/Data/LINCS/HGF",
 			"1", "4", "8", "24", "48");
 	}
 }
