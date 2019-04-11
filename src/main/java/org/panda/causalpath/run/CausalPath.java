@@ -411,7 +411,8 @@ public class CausalPath
 		// Mark some decisions
 		boolean useCorrelation = transformation == ValueTransformation.CORRELATION;
 		boolean controlFDR = ((transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN ||
-			transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED) &&
+			transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED ||
+			transformation == ValueTransformation.SIGNED_P_VALUES) &&
 			fdrThresholdForDataSignificance != null) ||
 			(transformation == ValueTransformation.CORRELATION && fdrThresholdForCorrelation > 0);
 
@@ -889,6 +890,11 @@ public class CausalPath
 				}
 			}
 		}
+		else if (transformation == ValueTransformation.SIGNED_P_VALUES)
+		{
+			detector = new SignificanceDetectorWithSignedPValues(fdrThresholdForDataSignificance == null ?
+				thresholdForDataSignificance.get(type) : 1);
+		}
 		return detector;
 	}
 
@@ -1054,6 +1060,11 @@ public class CausalPath
 			"threshold-for-data-significance should be used for a p-value threshold, or alternatively, " +
 			"fdr-threshold-for-data-significance should be used for controlling significance at the false discovery " +
 			"rate level.", true),
+
+		SIGNED_P_VALUES("signed-p-values", "If the dataset has its own calculation of p-values desired to be used " +
+			"directly, then for each comparison, there must be a column in the dataset that has these p-values " +
+			"multiplied with the sign of the change. For instance a value -0.001 means downregulation with a p-value " +
+			"of 0.001. If an FDR control is desired, then the p-values should not be adjusted.", false),
 
 		CORRELATION("correlation", "There should be one group of values (marked with value-column). There must be at " +
 			"least 3 value columns technically, but many more " +
