@@ -75,10 +75,15 @@ public class TCGALoader
 	// todo: Make loading parameterized by passing the types of desired data.
 	public TCGALoader(String dir)
 	{
-		try{cnaReader = new CNAReader(dir + COPY_NUMBER_FILE, false, 0);} catch (FileNotFoundException e){}
-		try{expReader = new ExpressionReader(dir + EXPRESSION_FILE);} catch (FileNotFoundException e){}
-		try{mutReader = new MutationReader(dir + MUTATION_FILE);} catch (IOException e){}
-		try{rppaReader = new RPPAReader(dir + RPPA_FILE);} catch (FileNotFoundException e){}
+		this(dir, 12);
+	}
+
+	public TCGALoader(String dir, int idLength)
+	{
+		try{cnaReader = new CNAReader(dir + COPY_NUMBER_FILE, null, false, 0, idLength);} catch (FileNotFoundException e){}
+		try{expReader = new ExpressionReader(dir + EXPRESSION_FILE, null, idLength);} catch (FileNotFoundException e){}
+		try{mutReader = new MutationReader(dir + MUTATION_FILE, idLength, null);} catch (IOException e){}
+		try{rppaReader = new RPPAReader(dir + RPPA_FILE, null, idLength);} catch (FileNotFoundException e){}
 		this.samples = getUnionSamples();
 		if (rppaReader != null) rppaCache = new HashMap<>();
 		dataCache = new HashMap<>();

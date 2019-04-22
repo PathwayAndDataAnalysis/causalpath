@@ -4,7 +4,13 @@ import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.Relation;
 import org.panda.utility.CollectionUtil;
+import org.panda.utility.FileUtil;
+import org.panda.utility.Tuple;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -53,12 +59,17 @@ public class CausalitySearcher implements Cloneable
 	/**
 	 * Set of pairs of data that contributed to inference.
 	 */
-	private Map<Relation, Set<Set<ExperimentData>>> pairsUsedForInference;
+	private Map<Relation, Set<List<ExperimentData>>> pairsUsedForInference;
 
 	/**
 	 * If true, then an expression relation has to have an Activity data at its source.
 	 */
 	protected boolean mandateActivityDataUpstreamOfExpression;
+
+	/**
+	 * The data types that can be used for evidence of expression change. This is typically protein or rna or both.
+	 */
+	protected DataType[] expressionEvidence;
 
 	/**
 	 * When true, this class uses only the strongest changing proteomic data with known effect as general activity
@@ -221,15 +232,20 @@ public class CausalitySearcher implements Cloneable
 	 */
 	private boolean satisfiesCriteria(Set<ExperimentData> sd, Relation rel, Set<ExperimentData> td)
 	{
+		boolean satisfies = false;
+
 		for (ExperimentData sourceData : sd)
 		{
 			for (ExperimentData targetData : td)
 			{
-				if (satisfiesCriteria(rel, sourceData, targetData)) return true;
+				if (satisfiesCriteria(rel, sourceData, targetData))
+				{
+					satisfies = true;
+				}
 			}
 		}
 
-		return false;
+		return satisfies;
 	}
 
 	/**
@@ -259,7 +275,7 @@ public class CausalitySearcher implements Cloneable
 
 				dataUsedForInference.get(rel).add(sourceData);
 				dataUsedForInference.get(rel).add(targetData);
-				pairsUsedForInference.get(rel).add(new HashSet<>(Arrays.asList(sourceData, targetData)));
+				pairsUsedForInference.get(rel).add(Arrays.asList(sourceData, targetData));
 			}
 			return true;
 		}
@@ -386,6 +402,7 @@ public class CausalitySearcher implements Cloneable
 
 	public Set<ExperimentData> getEvidenceForExpressionChange(GeneWithData gene)
 	{
+		if (expressionEvidence != null) return gene.getData(expressionEvidence);
 		return gene.getData(DataType.PROTEIN);
 	}
 
@@ -405,7 +422,7 @@ public class CausalitySearcher implements Cloneable
 		{
 			Optional<ProteinData> opt = data.stream().filter(d -> d instanceof ProteinData && d.getEffect() != 0)
 				.map(d -> (ProteinData) d).sorted((d1, d2) ->
-					Double.valueOf(Math.abs(d2.getChangeValue())).compareTo(Math.abs(d1.getChangeValue()))).findFirst();
+					Double.compare(Math.abs(d2.getChangeValue()), Math.abs(d1.getChangeValue()))).findFirst();
 
 			if (opt.isPresent())
 			{
@@ -413,6 +430,46 @@ public class CausalitySearcher implements Cloneable
 				data.removeIf(d -> d instanceof ProteinData && d != ed);
 			}
 		}
+	}
+
+	public void writeResults(String filename) throws IOException
+	{
+		if (pairsUsedForInference.isEmpty()) return;
+
+		TwoDataChangeDetector relDet = pairsUsedForInference.keySet().iterator().next().chDet;
+		CorrelationDetector corDet = relDet instanceof CorrelationDetector ? (CorrelationDetector) relDet : null;
+
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get(filename));
+		writer.write("Source\tRelation\tTarget\tSites\t");
+		if (corDet != null) writer.write("Source data ID\tTarget data ID\tCorrelation\tCorrelation pval");
+		else writer.write("Source data ID\tSource change\t Source change pval\tTarget data ID\tTarget change\tTarget change pval");
+
+		pairsUsedForInference.keySet().stream().forEach(r -> pairsUsedForInference.get(r).stream().forEach(pair ->
+		{
+			Iterator<ExperimentData> iter = pair.iterator();
+			ExperimentData sourceData = iter.next();
+			ExperimentData targetData = iter.next();
+
+			FileUtil.lnwrite(r.source + "\t" + r.type.getName() + "\t" + r.target + "\t" + r.getSitesInString() + "\t", writer);
+
+			if (corDet != null)
+			{
+				Tuple t = corDet.calcCorrelation(sourceData, targetData);
+				FileUtil.write(sourceData.getId() + "\t" + targetData.getId() + "\t" + t.v + "\t" + t.p, writer);
+			}
+			else
+			{
+				OneDataChangeDetector sDet = sourceData.getChDet();
+				OneDataChangeDetector tDet = targetData.getChDet();
+
+				FileUtil.write(sourceData.getId() + "\t" + sourceData.getChangeValue() + "\t" +
+					(sDet instanceof SignificanceDetector ? ((SignificanceDetector) sDet).getPValue(sourceData) : "") + "\t", writer);
+
+				FileUtil.write(targetData.getId() + "\t" + targetData.getChangeValue() + "\t" +
+					(tDet instanceof SignificanceDetector ? ((SignificanceDetector) tDet).getPValue(targetData) : ""), writer);
+			}
+		}));
+		writer.close();
 	}
 
 	public void setCausal(boolean causal)
@@ -430,10 +487,50 @@ public class CausalitySearcher implements Cloneable
 		return dataUsedForInference.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
 	}
 
-	public Set<Set<ExperimentData>> getPairsUsedForInference()
+	public Set<List<ExperimentData>> getPairsUsedForInference()
 	{
 		return pairsUsedForInference.values().stream().flatMap(Collection::stream).collect(Collectors.toSet());
 	}
+
+	//--DEBUG----------
+	public void writePairsUsedForInferenceWithCorrelations(String file)
+	{
+		try
+		{
+			BufferedWriter writer = Files.newBufferedWriter(Paths.get(file));
+			Set<List<ExperimentData>> pairs = getPairsUsedForInference();
+
+			CorrelationDetector cd = new CorrelationDetector(-1, 1);
+			Map<String, Double> pvals = new HashMap<>();
+
+			for (List<ExperimentData> pair : pairs)
+			{
+				Iterator<ExperimentData> iter = pair.iterator();
+				ExperimentData data1 = iter.next();
+				ExperimentData data2 = iter.next();
+
+				Tuple corr = cd.calcCorrelation(data1, data2);
+				if (!corr.isNaN())
+				{
+					StringBuilder sb = new StringBuilder();
+					pair.stream().sorted(Comparator.comparing(ExperimentData::getId))
+						.forEach(e -> sb.append(e.getId()).append(":"));
+					String id = sb.toString();
+
+					pvals.put(id, corr.p);
+				}
+			}
+
+			pvals.forEach((s, p) -> FileUtil.writeln(s + "\t" + p, writer));
+
+			writer.close();
+		}
+		catch (IOException e)
+		{
+			e.printStackTrace();
+		}
+	}
+	//--DEBUG----------
 
 	public Map<Relation, Set<ExperimentData>> getInferenceUnits()
 	{
@@ -488,5 +585,19 @@ public class CausalitySearcher implements Cloneable
 	public GraphFilter getGraphFilter()
 	{
 		return graphFilter;
+	}
+
+	public void setExpressionEvidence(DataType... types)
+	{
+		expressionEvidence = types;
+	}
+
+	/**
+	 * This method is experimental, only to test how good is RNA expression as a proxy to protein activity. It is not
+	 * meant to be used in a regular CausalPath analysis.
+	 */
+	public void useExpressionForActivity()
+	{
+		this.generalActivityChangeIndicators = new HashSet<>(Collections.singletonList(DataType.RNA));
 	}
 }

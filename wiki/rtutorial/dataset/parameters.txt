@@ -1,0 +1,17 @@
+proteomics-values-file = data-fdr0.1.txt
+id-column = ID
+symbols-column = Symbols
+sites-column = Sites
+effect-column = Effect
+
+value-transformation = arithmetic-mean
+threshold-for-data-significance = 0.001 phosphoprotein
+color-saturation-value = 5
+
+calculate-network-significance = true
+permutations-for-significance = 1000
+fdr-threshold-for-network-significance = 0.1
+
+gene-activity = EGF a
+
+value-column = 2min

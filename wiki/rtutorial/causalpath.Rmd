@@ -1,0 +1,88 @@
+---
+title: "CausalPath"
+output:
+  github_document: default
+  html_notebook: default
+---
+  
+```{r knitrSetup, include=FALSE}
+library(knitr)
+opts_chunk$set(out.extra='style="display:block; margin: auto"', fig.align="center", tidy=FALSE)
+verbose <- FALSE
+```
+
+# Purpose
+
+Example usage of the CausalPath analysis.
+
+## Publication 
+
+PDF available here: https://www.biorxiv.org/content/early/2018/02/05/258855
+
+## Code and Parameter Description 
+
+Code repository: https://github.com/PathwayAndDataAnalysis/causalpath
+
+# Background 
+## Background: Method 
+This method generates causal explanations for proteomic profiles using prior mechanistic knowledge in the literature, as recorded in cellular pathway maps. 
+
+# Run CausalPath
+## Parameters 
+
+```{r, engine='bash'}
+cat dataset/parameters.txt
+```
+
+## Run CausalPath 
+
+causalpath.jar available from: https://github.com/PathwayAndDataAnalysis/causalpath/releases
+
+```{r, engine='bash'}
+java -jar causalpath.jar dataset
+```
+
+# Result Visualization
+## Load Libraries 
+
+paxtoolsr Code Repository: https://github.com/BioPAX/paxtoolsr
+
+```{r}
+library(paxtoolsr)
+library(igraph)
+```
+
+## Causative Network
+
+```{r}
+sif <- readSif("dataset/causative.sif")
+head(sif)
+```
+
+```{r, fig.width=10, fig.height=10}
+g <- loadSifInIgraph(sif)
+plot(g)
+```
+
+## Conflicting Network
+
+```{r}
+sif <- readSif("dataset/conflicting.sif")
+head(sif)
+```
+
+```{r, fig.width=10, fig.height=10}
+g <- loadSifInIgraph(sif)
+plot(g)
+```
+
+# Troubleshooting
+## Phosphoproteomic Site Locations 
+
+A review of site locations in this work shows that site locations in literature does not always map to the sequence of the canonical protein isoform provided by UniProt. One option is to relax the constraint on exact site matching to allow a difference of 1-2 amino acids. 
+
+# Session Info
+
+```{r}
+sessionInfo()
+```

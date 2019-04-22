@@ -4,11 +4,14 @@ import org.panda.causalpath.analyzer.TwoDataChangeDetector;
 import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.GeneWithData;
 import org.panda.causalpath.data.PhosphoSite;
+import org.panda.resource.siteeffect.SiteEffectCollective;
 import org.panda.utility.CollectionUtil;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * That is a potential causality relation.
@@ -64,6 +67,20 @@ public class Relation
 		this.mediators = mediators;
 	}
 
+	public Relation(String line)
+	{
+		String[] token = line.split("\t");
+		this.source = token[0];
+		this.target = token[2];
+		this.type = RelationType.getType(token[1]);
+		if (token.length > 3) this.mediators = token[3];
+		if (token.length > 4)
+		{
+			sites = Arrays.stream(token[4].split(";")).map(s -> new PhosphoSite(Integer.valueOf(s.substring(1)),
+				String.valueOf(s.charAt(0)), 0)).collect(Collectors.toSet());
+		}
+	}
+
 	/**
 	 * Sign of the relation.
 	 */
@@ -74,8 +91,7 @@ public class Relation
 
 	public String toString()
 	{
-		return source + "\t" + type.name + "\t" + target + "\t" + mediators +
-			(sites == null ? "" : "\t" + CollectionUtil.merge(sites, ";"));
+		return source + "\t" + type.getName() + "\t" + target + "\t" + mediators + "\t" + getSitesInString();
 	}
 
 	public String getMediators()
@@ -96,6 +112,11 @@ public class Relation
 			}
 		}
 		return set;
+	}
+
+	public String getSitesInString()
+	{
+		return sites == null ? "" : CollectionUtil.merge(sites, ";");
 	}
 
 	public Set<ExperimentData> getAllData()

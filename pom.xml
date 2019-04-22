@@ -6,11 +6,7 @@
 
 	<groupId>org.panda</groupId>
 	<artifactId>causalpath</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
-
-	<properties>
-		<causality.version>1.0.1-SNAPSHOT</causality.version>
-	</properties>
+	<version>1.2.0-SNAPSHOT</version>
 
 	<repositories>
 		<repository>
@@ -54,20 +50,15 @@
 
 
 	<dependencies>
-		<!--<dependency>-->
-			<!--<groupId>org.cbio</groupId>-->
-			<!--<artifactId>causality</artifactId>-->
-			<!--<version>${causality.version}</version>-->
-		<!--</dependency>-->
 		<dependency>
 			<groupId>org.panda</groupId>
 			<artifactId>utility</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>1.2.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>org.panda</groupId>
 			<artifactId>resource</artifactId>
-			<version>1.0.0-SNAPSHOT</version>
+			<version>1.2.0-SNAPSHOT</version>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
@@ -78,7 +69,7 @@
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-math3</artifactId>
-			<version>3.0</version>
+			<version>3.3</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>

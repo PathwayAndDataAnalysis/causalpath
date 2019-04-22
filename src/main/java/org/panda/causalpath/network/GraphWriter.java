@@ -222,7 +222,7 @@ public class GraphWriter
 
 			if (data.hasChangeDetector())
 			{
-				if (data.getChangeSign() != 0)
+				if (data.getChangeSign() != 0 || showInsignificantData)
 				{
 					colS = vtc.getColorInString(data.getChangeValue());
 				}
@@ -261,7 +261,7 @@ public class GraphWriter
 			}
 			else if (data instanceof ActivityData)
 			{
-				let = "a";
+				let = data.getChangeSign() > 0 ? "a" : "i";
 				bor = inString(activatingBorderColor);
 			}
 
@@ -299,7 +299,7 @@ public class GraphWriter
 				}
 				else
 				{
-					FileUtil.writeln("node\t" + gene + "\trppasite\t" + siteID + "|" + let + "|" + colS + "|" + bor +
+					FileUtil.writeln("node\t" + gene + "\trppasite\t" + siteID.replaceAll("\\|", "-") + "|" + let + "|" + colS + "|" + bor +
 						"|" + val, writer2);
 				}
 			}
@@ -351,7 +351,7 @@ public class GraphWriter
 			{
 				for (ExperimentData target : targets)
 				{
-					FileUtil.writeln(source.getId() + "\t" + r.type.name + "\t" + target.getId(), writer1);
+					FileUtil.writeln(source.getId() + "\t" + r.type.getName() + "\t" + target.getId(), writer1);
 					used.add(source);
 					used.add(target);
 				}
@@ -396,7 +396,7 @@ public class GraphWriter
 
 		relations.forEach(rel ->
 		{
-			String key = rel.source + "\t" + rel.type.name + "\t" + rel.target;
+			String key = rel.source + "\t" + rel.type.getName() + "\t" + rel.target;
 			if (relMem.contains(key)) return;
 			else relMem.add(key);
 
@@ -406,8 +406,17 @@ public class GraphWriter
 			edge.put("data", dMap);
 			dMap.put("source", rel.source);
 			dMap.put("target", rel.target);
-			dMap.put("edgeType", rel.type.name);
+			dMap.put("edgeType", rel.type.getName());
 			dMap.put("tooltipText", CollectionUtil.merge(rel.getTargetWithSites(0), ", "));
+
+			if (rel.getMediators() != null)
+			{
+				List<String> medList = Arrays.asList(rel.getMediators().split(";| "));
+				if (!medList.isEmpty())
+				{
+					dMap.put("pcLinks", medList);
+				}
+			}
 		});
 
 		Set<String> totalProtUsedUp = new HashSet<>();
@@ -459,7 +468,7 @@ public class GraphWriter
 			}
 			else if (data instanceof ActivityData)
 			{
-				let = "a";
+				let = data.getChangeSign() > 0 ? "a" : "i";
 				bor = inJSONString(activatingBorderColor);
 			}
 

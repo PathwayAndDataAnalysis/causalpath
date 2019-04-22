@@ -123,6 +123,7 @@ public class ProteomicsFileReader
 			for (int i = 0; i < colname.length; i++)
 			{
 				valInd[i] = header.indexOf(colname[i]);
+				if (valInd[i] == -1) throw new RuntimeException("Cannot find the column \"" + colname[i] + "\"");
 			}
 
 			while (sc.hasNextLine())

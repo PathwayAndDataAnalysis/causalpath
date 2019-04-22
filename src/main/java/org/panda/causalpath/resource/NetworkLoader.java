@@ -65,6 +65,30 @@ public class NetworkLoader
 			addGraph(allGraphs, SignedType.PHOSPHORYLATES, PhosphoNetworks.get().getGraph());
 		}
 
+		// Add NetworKIN
+		if (resourceTypes.contains(ResourceType.NetworKIN))
+		{
+			addGraph(allGraphs, SignedType.PHOSPHORYLATES, NetworKIN.get().getGraph());
+		}
+
+		// Add Rho GEF
+		if (resourceTypes.contains(ResourceType.RHOGEF))
+		{
+			addGraph(allGraphs, SignedType.ACTIVATES_GTPASE, RhoGEF.get().getGraph());
+		}
+
+		// Experimental code!!!!!!!!!!!!!!!!!!!
+		if (resourceTypes.contains(ResourceType.PCTCGAConsensus))
+		{
+			DirectedGraph posG = new DirectedGraph("Pos", SignedType.UPREGULATES_EXPRESSION.getTag());
+			DirectedGraph negG = new DirectedGraph("Neg", SignedType.DOWNREGULATES_EXPRESSION.getTag());
+			String file = "/home/babur/Documents/PC/SignedByTCGAConsensusFiltered.sif";
+			posG.load(file, Collections.singleton(posG.getEdgeType()));
+			negG.load(file, Collections.singleton(negG.getEdgeType()));
+			addGraph(allGraphs, SignedType.UPREGULATES_EXPRESSION, posG);
+			addGraph(allGraphs, SignedType.DOWNREGULATES_EXPRESSION, negG);
+		}
+
 		// Add TRRUST
 		if (resourceTypes.contains(ResourceType.TRRUST))
 		{
@@ -87,8 +111,6 @@ public class NetworkLoader
 
 			// take a subset of the network for debugging
 //			graph.crop(Arrays.asList("HCK", "CD247"));
-
-			SiteEffectCollective sec = new SiteEffectCollective();
 
 			for (String source : graph.getOneSideSymbols(true))
 			{
@@ -117,9 +139,8 @@ public class NetworkLoader
 
 							for (String site : sites)
 							{
-								Integer effect = sec.getEffect(target, site);
 								rel.sites.add(new PhosphoSite(Integer.parseInt(site.substring(1)),
-									site.substring(0, 1), effect == null ? 0 : effect));
+									site.substring(0, 1), 0));
 							}
 						}
 					}
@@ -131,6 +152,23 @@ public class NetworkLoader
 
 		// initiate source and target data
 
+		initSourceTargetData(relations);
+
+		return relations;
+	}
+
+	public static Set<Relation> load(String customFile) throws IOException
+	{
+		Set<Relation> relations = Files.lines(Paths.get(customFile)).filter(l -> !l.isEmpty() && !l.startsWith("#")).map(Relation::new)
+			.collect(Collectors.toSet());
+
+		initSourceTargetData(relations);
+
+		return relations;
+	}
+
+	private static void initSourceTargetData(Set<Relation> relations)
+	{
 		Set<String> genes = relations.stream().map(r -> r.source).collect(Collectors.toSet());
 		genes.addAll(relations.stream().map(r -> r.target).collect(Collectors.toSet()));
 
@@ -142,8 +180,6 @@ public class NetworkLoader
 			relation.sourceData = map.get(relation.source);
 			relation.targetData = map.get(relation.target);
 		}
-
-		return relations;
 	}
 
 	private static void mergeSecondMapIntoFirst(Map<SignedType, DirectedGraph> allGraphs, Map<SignedType, DirectedGraph> graphs)
@@ -167,8 +203,12 @@ public class NetworkLoader
 		REACH("Network derived from REACH NLP extraction results for phosphorylation relations."),
 		PhosphoNetworks("The PhosphoNetworks database for phosphorylations."),
 		IPTMNet("The IPTMNet database for phosphorylations."),
+		RHOGEF("The experimental Rho - GEF relations."),
+		PCTCGAConsensus("Unsigned PC relations whose signs are inferred by TCGA studies"),
 		TRRUST("The TRRUST database for expression relations."),
-		TFactS("The TFactS database for expression relations.");
+		TFactS("The TFactS database for expression relations."),
+		NetworKIN("The NetworKIN database for phosphorylation relations."),
+		;
 
 		String description;
 
@@ -177,10 +217,10 @@ public class NetworkLoader
 			this.description = description;
 		}
 
-		public static Set<ResourceType> getSelectedResources(String s)
+		public static Set<ResourceType> getSelectedResources(Set<String> names)
 		{
 			Set<ResourceType> set = new HashSet<>();
-			for (String res : s.split(",|;|\\s+|\\|"))
+			for (String res : names)
 			{
 				res = res.trim();
 
@@ -228,6 +268,26 @@ public class NetworkLoader
 
 	public static void main(String[] args) throws IOException
 	{
+//		writeSitesWithUpstream();
+		writeRelations();
+	}
+
+	private static void writeRelations() throws IOException
+	{
+		Set<Relation> rels = NetworkLoader.load();
+
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/ozgun/Documents/Temp/causal-priors.txt"));
+
+		for (Relation rel : rels)
+		{
+			writer.write(rel.toString() + "\n");
+		}
+
+		writer.close();
+	}
+
+	public static void writeSitesWithUpstream() throws IOException
+	{
 		Set<Relation> rels = NetworkLoader.load(new HashSet<>(Arrays.asList(ResourceType.PC, ResourceType.PhosphoNetworks)));
 		Map<String, Set<PhosphoSite>> map = new HashMap<>();
 		for (Relation rel : rels)
@@ -238,7 +298,7 @@ public class NetworkLoader
 				map.get(rel.target).addAll(rel.sites);
 			}
 		}
-		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/babur/Documents/Temp/gene-to-sites.txt"));
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/ozgun/Documents/Temp/gene-to-sites.txt"));
 
 		for (String gene : map.keySet())
 		{
@@ -248,5 +308,10 @@ public class NetworkLoader
 		}
 
 		writer.close();
+	}
+
+	public static void writeRelationsToFile()
+	{
+
 	}
 }

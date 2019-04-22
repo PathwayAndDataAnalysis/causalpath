@@ -5,7 +5,7 @@ This is a tool for pathway analysis of proteomic and phosphoproteomic datasets. 
 
 To analyze your dataset, please visit our **[web-service](http://www.causalpath.org)** that runs an instance of CausalPath.
 
-Alternatively, users can locally run the Java code in this project on their datasets, and visualize the results in [ChiBE](https://github.com/PathwayCommons/chibe). But in both cases, to use this tool, users need to [prepare input files](wiki/InputFormat.md) to feed into the analysis.
+Alternatively, users can locally run the Java code in this project on their datasets, and visualize the results in [ChiBE](https://github.com/PathwayCommons/chibe). But in both cases, to use this tool, users need to [prepare input files](wiki/InputFormat.md) to feed into the analysis. You can also find a description of output files [here](wiki/OutputFiles.md).
 
 To get a copy of the project and build it, first make sure you have [git](https://git-scm.com/downloads), [maven](https://maven.apache.org/download.cgi) and [JDK8](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html) in your system, then while in your projects folder, do:
 ```
@@ -22,4 +22,4 @@ The input directory has to contain a `parameters.txt` file which provides the ne
 
 After CausalPath runs on your input data, it generates output in the same input directory where the `parameters.txt` is. Among those output files, `causal.sif` and `causal.format` are two files that ChiBE needs for displaying the result graph. To display, please open ChiBE and from the menu, do `SIF -> Load SIF File`. Navigate to the directory and select `causal.sif`. 
 
-A manuscript for this method is under preparation. Additionally, another manuscript that use CausalPath to explore platelet activation pathways is under review.
+A work-in-progress manuscript describing this method is available [here](https://www.biorxiv.org/content/early/2018/02/05/258855). Additionally, another manuscript that use an earlier version of CausalPath to explore platelet activation pathways is available [here](http://www.physiology.org/doi/abs/10.1152/ajpcell.00177.2017).

@@ -199,7 +199,7 @@ public class MergeResultsIntoSeriesView
 
 	public static void main(String[] args) throws IOException
 	{
-		run("/home/babur/Documents/Analyses/Koksal-EGF/run-fdr-0.1",
-			"2min", "4min", "8min", "16min", "32min", "64min", "128min");
+		run("/home/ozgun/Data/LINCS/HGF",
+			"1", "4", "8", "24", "48");
 	}
 }

@@ -69,6 +69,9 @@ public class GraphFilter
 			case EXPRESSION_ONLY: relations = relations.stream()
 				.filter(r -> r.type.affectsTotalProt).collect(Collectors.toSet());
 				break;
+			case WITHOUT_EXPRESSION: relations = relations.stream()
+				.filter(r -> !r.type.affectsTotalProt).collect(Collectors.toSet());
+				break;
 			default: throw new RuntimeException("Unhandled relation filter type: " + relationFilterType);
 		}
 
@@ -98,6 +101,7 @@ public class GraphFilter
 			case NO_FILTER:
 			case PHOSPHO_ONLY:
 			case EXPRESSION_ONLY:
+			case WITHOUT_EXPRESSION:
 				break;
 			case PHOSPHO_PRIMARY_EXPRESSION_SECONDARY:
 			{
@@ -141,6 +145,7 @@ public class GraphFilter
 		NO_FILTER ("The graph is used with all inferred relations."),
 		PHOSPHO_ONLY ("Only phosphorylation relations are desired."),
 		EXPRESSION_ONLY ("Only expression relations are desired."),
+		WITHOUT_EXPRESSION ("Everything but expression relations are desired."),
 		PHOSPHO_PRIMARY_EXPRESSION_SECONDARY ("All phosphorylation relations " +
 			"are desired. Expression relations are desired only as supplemental, i.e., they have to involve at least " +
 			"one protein that exists in phospho graph.");
