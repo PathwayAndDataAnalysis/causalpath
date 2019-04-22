@@ -155,7 +155,7 @@ public class SignificanceDetector extends DifferenceDetector
 				sign = Math.signum(ttest.v);
 			}
 
-			return new Tuple(sign * (p == 0 ? 100 : -Math.log(p)), p);
+			return new Tuple(sign * (p == 0D ? 100 : -Math.log(p)), p);
 		}
 		else if (data instanceof CategoricalData)
 		{
