@@ -35,7 +35,7 @@ public class SignificanceDetectorWithSignedPValues extends SignificanceDetector
 		double sign = Math.signum(signedP);
 		double p = Math.abs(signedP);
 
-		return new Tuple(sign * (p == 0D ? 100 : -Math.log(p)), p);
+		return new Tuple(sign * (p == 0 ? 100 : -Math.log(p)), p);
 	}
 
 	@Override
