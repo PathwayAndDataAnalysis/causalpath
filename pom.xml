@@ -43,6 +43,7 @@
 						</archive>
 					</configuration>
 				</plugin>
+
 			</plugins>
 		</pluginManagement>
 	</build>
