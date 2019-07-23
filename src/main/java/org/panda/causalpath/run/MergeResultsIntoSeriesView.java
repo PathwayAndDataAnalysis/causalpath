@@ -28,11 +28,16 @@ public class MergeResultsIntoSeriesView
 
 	public MergeResultsIntoSeriesView(List<String> inDirs, String outDir)
 	{
+		if (inDirs.size() < 2)
+		{
+			throw new RuntimeException("Need at least two input folders. Found only " + inDirs.size() + ".");
+		}
+
 		this.inDirs = inDirs;
 		this.outDir = outDir;
 	}
 
-	public void run() throws IOException
+	public void runFlatFolders() throws IOException
 	{
 
 		Set<String> relations = new HashSet<>();
@@ -65,16 +70,14 @@ public class MergeResultsIntoSeriesView
 		writer1.close();
 
 		List<List<String>> formatLists = new ArrayList<>();
-		List<String> stepNames = new ArrayList<>();
-
 		for (String inDir : inDirs)
 		{
 			formatLists.add(Files.lines(Paths.get(inDir + File.separator + FORMAT_FILE))
 				.filter(l -> !l.contains("all-nodes") && !l.contains("all-edges"))
 				.collect(Collectors.toList()));
-
-			stepNames.add(inDir.substring(inDir.lastIndexOf(File.separator) + 1));
 		}
+
+		List<String> stepNames = getStepNames(inDirs);
 
 		// collect representative lines from all sites
 		Map<String, String> allSites = new HashMap<>();
@@ -157,6 +160,54 @@ public class MergeResultsIntoSeriesView
 
 	}
 
+	/**
+	 * Generates step names by removing the common prefixes and suffixes of the inDirs.
+	 * @param inDirs
+	 * @return
+	 */
+	private List<String> getStepNames(List<String> inDirs)
+	{
+		String prefix = getCommon(inDirs, true);
+		String suffix = getCommon(inDirs, false);
+
+		return inDirs.stream().map(s -> s.substring(prefix.length(), s.length() - suffix.length()))
+			.collect(Collectors.toList());
+	}
+
+	private String getCommon(List<String> inDirs, boolean prefix)
+	{
+		String s1 = inDirs.get(0);
+
+		for (int i = 1; i < inDirs.size(); i++)
+		{
+			String s2 = inDirs.get(i);
+			s1 = prefix ? getCommonPrefix(s1, s2) : getCommonSuffix(s1, s2);
+		}
+
+		return s1;
+	}
+
+	private String getCommonPrefix(String s1, String s2)
+	{
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < Math.min(s1.length(), s2.length()); i++)
+		{
+			if (s1.charAt(i) == s2.charAt(i)) sb.append(s1.charAt(i));
+			else break;
+		}
+		return sb.toString();
+	}
+	private String getCommonSuffix(String s1, String s2)
+	{
+		StringBuilder sb = new StringBuilder();
+		for (int i = 1; i <= Math.min(s1.length(), s2.length()); i++)
+		{
+			if (s1.charAt(s1.length() - i) == s2.charAt(s2.length() - i)) sb.append(s1.charAt(s1.length() - i));
+			else break;
+		}
+		return sb.reverse().toString();
+	}
+
 	private String getEdgeColor(SignedType type)
 	{
 		switch (type)
@@ -169,37 +220,48 @@ public class MergeResultsIntoSeriesView
 		}
 	}
 
-	public static void run(String dir, String... subDirNames) throws IOException
+	public static void runFlatFolders(String dir, String... subDirNames) throws IOException
 	{
-		List<String> dirs;
+		List<String> inDirs;
 
-		if (subDirNames.length > 0)
+		if (subDirNames.length == 0)
 		{
-			dirs = new ArrayList<>();
-			for (String subDirName : subDirNames)
-			{
-				dirs.add(dir + File.separator + subDirName);
-			}
-		}
-		else
-		{
-			dirs = Files.list(Paths.get(dir)).filter(p ->
+			inDirs = Files.list(Paths.get(dir)).filter(p ->
 				Files.isDirectory(p) &&
 					Files.exists(Paths.get(p.toString() + File.separator + SIF_FILE)) &&
 					Files.exists(Paths.get(p.toString() + File.separator + PARAMETERS_FILE)))
 				.map(Path::toString).collect(Collectors.toList());
 		}
+		else
+		{
+			inDirs = Arrays.stream(subDirNames).map(d -> dir + File.separator + d).collect(Collectors.toList());
+		}
 
-		String outDir = dir + File.separator + DEFAULT_OUT_DIR;
+		if (inDirs.size() < 2)
+		{
+			throw new RuntimeException("Need at least two input folders. Found only " + inDirs.size() + ".");
+		}
+
+		MergeResultsIntoSeriesView app = new MergeResultsIntoSeriesView(inDirs, dir + File.separator + DEFAULT_OUT_DIR);
+		app.runFlatFolders();
+	}
+
+	public static void run(String outDir, String... inDirs) throws IOException
+	{
+		if (inDirs.length < 2)
+		{
+			throw new RuntimeException("Need at least two input folders. Found only " + inDirs.length + ".");
+		}
+
 		Files.createDirectories(Paths.get(outDir));
 
-		MergeResultsIntoSeriesView app = new MergeResultsIntoSeriesView(dirs, outDir);
-		app.run();
+		MergeResultsIntoSeriesView app = new MergeResultsIntoSeriesView(Arrays.asList(inDirs), outDir);
+		app.runFlatFolders();
 	}
 
 	public static void main(String[] args) throws IOException
 	{
-		run("/home/ozgun/Data/LINCS/HGF",
+		runFlatFolders("/home/ozgun/Data/LINCS/HGF",
 			"1", "4", "8", "24", "48");
 	}
 }

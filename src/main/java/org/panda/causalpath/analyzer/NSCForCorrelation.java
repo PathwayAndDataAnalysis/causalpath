@@ -128,6 +128,7 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 			prog.tick();
 		}
 
+		fileToWriteNullDistVals = "graph-size-null-dist.txt";
 		if (fileToWriteNullDistVals != null)
 		{
 			try
@@ -148,10 +149,10 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 
 		//----- DEBUG------------------------------
 		// Plot graph size significance
-//		Map<String, double[]> map = new HashMap<>();
-//		map.put(ArrayUtil.mean(sizes) + " (mean of random)", sizes);
-//		map.put(sizeCurrent + " (actual)", new double[]{sizeCurrent});
-//		KernelDensityPlot.plot("Graph size distribution", map);
+		Map<String, double[]> map = new HashMap<>();
+		map.put(ArrayUtil.mean(sizes) + " (mean of random)", sizes);
+		map.put(sizeCurrent + " (actual)", new double[]{sizeCurrent});
+		KernelDensityPlot.plot("Graph size distribution", map);
 		//----- DEBUG------------------------------
 
 		// Convert counts to p-values
