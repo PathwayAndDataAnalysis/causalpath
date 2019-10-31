@@ -78,6 +78,11 @@ public class CausalitySearcher implements Cloneable
 	protected boolean useStrongestProteomicsDataForActivity;
 
 	/**
+	 * When true, if a node has activity data, other data types are ignored for providing activity evidence.
+	 */
+	protected boolean prioritizeActivityData;
+
+	/**
 	 * Data types that indicate activity change.
 	 */
 	Set<DataType> generalActivityChangeIndicators;
@@ -376,6 +381,11 @@ public class CausalitySearcher implements Cloneable
 			removeShadowedProteomicData(set);
 		}
 
+		if (prioritizeActivityData)
+		{
+			removeOtherDataIfActivityDataIsPresent(set);
+		}
+
 		return set;
 	}
 
@@ -429,6 +439,14 @@ public class CausalitySearcher implements Cloneable
 				ExperimentData ed = opt.get();
 				data.removeIf(d -> d instanceof ProteinData && d != ed);
 			}
+		}
+	}
+
+	protected void removeOtherDataIfActivityDataIsPresent(Set<ExperimentData> data)
+	{
+		if (data.stream().anyMatch(d -> d instanceof ActivityData))
+		{
+			data.retainAll(data.stream().filter(d -> d instanceof ActivityData).collect(Collectors.toSet()));
 		}
 	}
 
@@ -555,6 +573,11 @@ public class CausalitySearcher implements Cloneable
 	public void setUseStrongestProteomicsDataForActivity(boolean use)
 	{
 		this.useStrongestProteomicsDataForActivity = use;
+	}
+
+	public void setPrioritizeActivityData(boolean prioritizeActivityData)
+	{
+		this.prioritizeActivityData = prioritizeActivityData;
 	}
 
 	public void addDataTypeForGeneralActivity(DataType type)

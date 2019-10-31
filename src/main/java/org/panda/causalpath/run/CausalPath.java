@@ -502,8 +502,6 @@ public class CausalPath
 //			cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/after.txt");
 		}
 
-		cs.writeResults(adjustFileLocation(RESULTS_FILENAME));
-
 //		loader.printStDevHistograms(cs.getDataUsedForInference());
 
 		// Significance calculation
@@ -519,6 +517,8 @@ public class CausalPath
 				causal = cs.run(relations);
 			}
 		}
+
+		cs.writeResults(adjustFileLocation(RESULTS_FILENAME));
 
 		int causativeSize = causal.size();
 		System.out.println("Causative relations = " + causativeSize);
@@ -1351,6 +1351,13 @@ public class CausalPath
 				" the detected active and inactive proteins as data to be used in the analysis. This applies only to " +
 				"the proteins that already have a changed data on them, and have no previous activity data associated.",
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false,
+			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
+		PRIORITIZE_ACTIVITY_DATA((value, cp) ->
+			cp.cs.setPrioritizeActivityData(Boolean.valueOf(value)),
+			"Prioritize activity data over proteomic data for evidence of activity change",
+			"When there is an ActivityData associated to a protein (can be user hypothesis or inferred by network " +
+				"significance), do not use  other omic data for evidence of activity change in causal reasoning.",
+			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, false, false,
 			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		MINIMUM_POTENTIAL_TARGETS_TO_CONSIDER_FOR_DOWNSTREAM_SIGNIFICANCE((value, cp) ->
 			cp.minimumPotentialTargetsToConsiderForDownstreamSignificance = Integer.valueOf(value),
