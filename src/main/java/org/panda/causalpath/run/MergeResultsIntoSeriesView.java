@@ -39,6 +39,7 @@ public class MergeResultsIntoSeriesView
 
 	public void runFlatFolders() throws IOException
 	{
+		Files.createDirectories(Paths.get(outDir));
 
 		Set<String> relations = new HashSet<>();
 		List<Set<String>> nodeSets = new ArrayList<>();
