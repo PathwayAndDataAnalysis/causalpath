@@ -135,6 +135,8 @@ public class CausalitySearcher implements Cloneable
 	 */
 	public Set<Relation> run(Set<Relation> relations)
 	{
+//		printSizeOfRelationsBetweenSignificantData(relations);
+
 		// Initialize collections
 
 		if (collectDataWithMissingEffect)
@@ -547,6 +549,14 @@ public class CausalitySearcher implements Cloneable
 		{
 			e.printStackTrace();
 		}
+	}
+	public void printSizeOfRelationsBetweenSignificantData(Set<Relation> relations)
+	{
+		Set<Relation> rels = relations.stream().filter(r -> r.sourceData.getDataStream().anyMatch(d -> d.getChangeSign() != 0) &&
+			r.targetData.getDataStream().anyMatch(d -> d.getChangeSign() != 0)).collect(Collectors.toSet());
+		System.out.println("rels between sig data = " + rels.size());
+		long protCnt = rels.stream().map(r -> Arrays.asList(r.source, r.target)).flatMap(Collection::stream).distinct().count();
+		System.out.println("protCnt = " + protCnt);
 	}
 	//--DEBUG----------
 

@@ -9,7 +9,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Maven: org.panda:utility:1.2.0-SNAPSHOT" level="project" />
+    <orderEntry type="module" module-name="utility" />
     <orderEntry type="library" name="Maven: org.apache.commons:commons-compress:1.7" level="project" />
     <orderEntry type="library" name="Maven: org.tukaani:xz:1.4" level="project" />
     <orderEntry type="library" name="Maven: org.apache.commons:commons-collections4:4.0" level="project" />
@@ -37,7 +37,7 @@
     <orderEntry type="library" name="Maven: com.github.fommil.netlib:netlib-native_system-linux-armhf:natives:1.1" level="project" />
     <orderEntry type="library" name="Maven: com.github.fommil.netlib:netlib-native_system-win-x86_64:natives:1.1" level="project" />
     <orderEntry type="library" name="Maven: com.github.fommil.netlib:netlib-native_system-win-i686:natives:1.1" level="project" />
-    <orderEntry type="library" name="Maven: org.panda:resource:1.2.0-SNAPSHOT" level="project" />
+    <orderEntry type="module" module-name="resource" />
     <orderEntry type="library" name="Maven: org.biopax.paxtools:paxtools-core:5.1.0" level="project" />
     <orderEntry type="library" name="Maven: net.sourceforge.collections:collections-generic:4.01" level="project" />
     <orderEntry type="library" name="Maven: org.apache.commons:commons-lang3:3.4" level="project" />

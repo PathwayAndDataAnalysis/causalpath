@@ -142,8 +142,9 @@ public class SignificanceDetector extends DifferenceDetector
 //			if (true) return new Tuple();
 
 			double[] vals = ((NumericData) data).vals;
-			double[] testVals = ArrayUtil.subset(vals, this.test);
-			double[] ctrlVals = ArrayUtil.subset(vals, control);
+
+			double[] testVals = paired ? ArrayUtil.subset(vals, test, control) : ArrayUtil.subset(vals, test);
+			double[] ctrlVals = paired ? ArrayUtil.subset(vals, control, test) : ArrayUtil.subset(vals, control);
 
 			double p = Double.NaN;
 			double sign = Double.NaN;
