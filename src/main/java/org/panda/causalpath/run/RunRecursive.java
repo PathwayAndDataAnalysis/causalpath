@@ -21,12 +21,13 @@ public class RunRecursive
 	{
 		if (Files.isDirectory(Paths.get(dir)))
 		{
-			if (Files.exists(Paths.get(dir + File.separator + CausalPath.PARAMETER_FILENAME)))
-//				&&
-//				!Files.exists(Paths.get(dir + File.separator + CausalPath.CAUSATIVE_RESULT_FILE_PREFIX + ".sif")))
+			if (Files.exists(Paths.get(dir + File.separator + CausalPath.PARAMETER_FILENAME))
+				&&
+				!Files.exists(Paths.get(dir + File.separator + CausalPath.CAUSATIVE_RESULT_FILE_PREFIX + ".sif")))
 			{
 				System.gc();
 				CausalPath.main(new String[]{dir});
+				System.out.println();
 			}
 			else
 			{

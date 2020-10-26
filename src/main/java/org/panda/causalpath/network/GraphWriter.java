@@ -287,7 +287,7 @@ public class GraphWriter
 
 					if (act && !inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(activatingBorderColor), writer2);
 					else if (!act && inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(inhibitingBorderColor), writer2);
-					else if (act /** && inh **/) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(doubleSignificanceBorderColor), writer2);
+					else if (act /* && inh */) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(doubleSignificanceBorderColor), writer2);
 					//else FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(defaultBorderColor), writer2);
 				}
 

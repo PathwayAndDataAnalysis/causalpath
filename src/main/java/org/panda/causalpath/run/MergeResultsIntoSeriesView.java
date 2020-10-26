@@ -262,7 +262,7 @@ public class MergeResultsIntoSeriesView
 
 	public static void main(String[] args) throws IOException
 	{
-		runFlatFolders("/home/ozgun/Data/LINCS/HGF",
-			"1", "4", "8", "24", "48");
+		runFlatFolders("/Users/ozgun/Documents/Analyses/Bouhaddou/",
+			"Inf_00Hr", "Inf_02Hr", "Inf_04Hr", "Inf_08Hr", "Inf_12Hr", "Inf_24Hr");
 	}
 }

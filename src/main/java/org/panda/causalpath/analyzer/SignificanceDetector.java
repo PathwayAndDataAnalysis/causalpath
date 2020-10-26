@@ -121,11 +121,11 @@ public class SignificanceDetector extends DifferenceDetector
 			}
 
 			// Get the combined signed p-value
-			double[] sP = StouffersCombinedProbability.combineP2Tailed(p, s);
+			Tuple sP = StouffersCombinedProbability.combineP2Tailed(p, s);
 
-			double pC = sP[0];
+			double pC = sP.p;
 			double vC = Summary.mean(v);
-			if (Math.signum(s[0]) != Math.signum(sP[1]) && Math.signum(v[0]) == Math.signum(vC))
+			if (Math.signum(s[0]) != Math.signum(sP.v) && Math.signum(v[0]) == Math.signum(vC))
 			{
 				vC = -vC;
 			}
