@@ -464,7 +464,9 @@ public class CausalitySearcher implements Cloneable
 		if (corDet != null) writer.write("Source data ID\tTarget data ID\tCorrelation\tCorrelation pval");
 		else writer.write("Source data ID\tSource change\t Source change pval\tTarget data ID\tTarget change\tTarget change pval");
 
-		pairsUsedForInference.keySet().stream().forEach(r -> pairsUsedForInference.get(r).stream().forEach(pair ->
+		pairsUsedForInference.keySet().stream().
+			sorted(Comparator.comparing(this::getRelationScore).reversed()). // Sort relations to their significance
+			forEach(r -> pairsUsedForInference.get(r).stream().forEach(pair ->
 		{
 			Iterator<ExperimentData> iter = pair.iterator();
 			ExperimentData sourceData = iter.next();
@@ -490,6 +492,47 @@ public class CausalitySearcher implements Cloneable
 			}
 		}));
 		writer.close();
+	}
+
+	/**
+	 * We want to sort the result rows according the their significance. This method generates a score for each relation
+	 * so that we can sort them using that score.
+	 */
+	private double getRelationScore(Relation r)
+	{
+		double max = -Double.MAX_VALUE;
+		Set<List<ExperimentData>> pairs = pairsUsedForInference.get(r);
+		for (List<ExperimentData> pair : pairs)
+		{
+			ExperimentData src = pair.get(0);
+			ExperimentData tgt = pair.get(1);
+
+			double val;
+
+			if (r.chDet instanceof CorrelationDetector)
+			{
+				val = -((CorrelationDetector) r.chDet).calcCorrelation(src, tgt).p;
+			}
+			else
+			{
+				OneDataChangeDetector sDet = src.getChDet();
+				OneDataChangeDetector tDet = tgt.getChDet();
+
+				if (sDet instanceof SignificanceDetector || tDet instanceof SignificanceDetector)
+				{
+					double vS = sDet instanceof SignificanceDetector ? ((SignificanceDetector) sDet).getPValue(src) : 0;
+					double vT = tDet instanceof SignificanceDetector ? ((SignificanceDetector) tDet).getPValue(tgt) : 0;
+					val = -Math.max(vS, vT);
+				}
+				else
+				{
+					val = Math.min(Math.abs(sDet.getChangeValue(src)), Math.abs(tDet.getChangeValue(tgt)));
+				}
+			}
+
+			if (val > max) max = val;
+		}
+		return max;
 	}
 
 	public void setCausal(boolean causal)

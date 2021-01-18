@@ -255,6 +255,8 @@ public class CausalPath
 	 */
 	CausalitySearcher cs;
 
+	private static boolean webServerMode = false;
+
 	public static void main(String[] args) throws IOException, ClassNotFoundException
 	{
 		if (args.length < 1)
@@ -278,6 +280,8 @@ public class CausalPath
 			System.out.println(Parameter.getParamsInfoForWiki());
 			return;
 		}
+
+		if (args.length > 1 && args[1].equals("-ws")) webServerMode = true;
 
 		new CausalPath(args[0]).run();
 	}
@@ -1325,18 +1329,19 @@ public class CausalPath
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name))),
-		CALCULATE_NETWORK_SIGNIFICANCE((value, cp) -> cp.calculateNetworkSignificance = Boolean.valueOf(value),
+		CALCULATE_NETWORK_SIGNIFICANCE((value, cp) -> cp.calculateNetworkSignificance = webServerMode ? false : Boolean.valueOf(value),
 			"Calculate network significance",
 			"Whether to calculate significances of the properties of the graph. When turned on, a p-value for network" +
 				" size, and also downstream activity enrichment p-values for each gene on the graph are calculated.",
-			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false, null),
+			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false, new Cond(Logical.NOT)),
 		PERMUTATIONS_FOR_SIGNIFICANCE((value, cp) -> cp.permutationCount = Integer.valueOf(value),
 			"Number of permutations for calculating network significance",
 			"We will do data randomization to see if the result network is large, or any protein's downstream is " +
 				"enriched. This parameter indicates the number of randomizations we should perform. It should be " +
 				"reasonable high, such as 1000, but not too high.",
 			new EntryType(Integer.class), new String[][]{{"1000"}}, true, false,
-			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
+			new Cond(Logical.NOT)),
+//			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
 		FDR_THRESHOLD_FOR_NETWORK_SIGNIFICANCE((value, cp) ->
 			cp.fdrThresholdForNetworkSignificance = Double.valueOf(value),
 			"FDR threshold for network significance",
@@ -1351,7 +1356,8 @@ public class CausalPath
 				" the detected active and inactive proteins as data to be used in the analysis. This applies only to " +
 				"the proteins that already have a changed data on them, and have no previous activity data associated.",
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false,
-			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
+			new Cond(Logical.NOT)),
+//			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		PRIORITIZE_ACTIVITY_DATA((value, cp) ->
 			cp.cs.setPrioritizeActivityData(Boolean.valueOf(value)),
 			"Prioritize activity data over proteomic data for evidence of activity change",
