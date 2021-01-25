@@ -1144,7 +1144,7 @@ public class CausalPath
 			"Name of the proteomics values file for the repeated experiment, if exists. This file has to have the " +
 				"exact same columns with the original proteomic values file, in the same order. Row IDs have to match" +
 				" with the corresponding row in the original data.",
-			new EntryType(File.class), null, true, false, null),
+			new EntryType(File.class), null, false, true, null),
 		PROTEOMICS_PLATFORM_FILE((value, cp) -> cp.proteomicsPlatformFile = value,
 			"Proteomics platform file",
 			"Name of the proteomics platform file. Each row should belong to either a gene's total protein " +
@@ -1348,7 +1348,8 @@ public class CausalPath
 			"The false discovery rate for network significance calculations for the downstream activity enrichment of" +
 				" genes.",
 			new EntryType(Double.class), new String[][]{{"0.1"}}, true, false,
-			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
+			new Cond(Logical.NOT)),
+//			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
 		USE_NETWORK_SIGNIFICANCE_FOR_CAUSAL_REASONING((value, cp) ->
 			cp.useNetworkSignificanceForCausalReasoning = Boolean.valueOf(value),
 			"Use network significance for causal reasoning",
@@ -1375,7 +1376,8 @@ public class CausalPath
 				"hurt the statistical power. Use this parameter to exclude genes with few qualifying targets on the " +
 				"network. Default is 5.",
 			new EntryType(Integer.class), new String[][]{{"5"}}, true, false,
-			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
+			new Cond(Logical.NOT)),
+//			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
 		DO_SITE_MATCHING((value, cp) -> cp.cs.setForceSiteMatching(Boolean.valueOf(value)),
 			"Do site matching",
 			"Whether to force site matching in causality analysis. True by default.",
