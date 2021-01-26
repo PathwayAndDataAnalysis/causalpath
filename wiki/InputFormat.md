@@ -25,6 +25,8 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `proteomics-values-file`: Name of the proteomics values file. It should have at least one ID column and one or more columns for experiment values. Platform file and values file can be the same file.
 
+`proteomics-repeat-values-file`: Name of the proteomics values file for the repeated experiment, if exists. This file has to have the exact same columns with the original proteomic values file, in the same order. Row IDs have to match with the corresponding row in the original data.
+
 `proteomics-platform-file`: Name of the proteomics platform file. Each row should belong to either a gene's total protein measurement, or a site specific measurement. This file should contain ID, gene symbols, modification sites, and known site effects. Platform file and values file can be the same file.
 
 `id-column`: The name of the ID column in platform and values files.
@@ -49,6 +51,10 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 	significant-change-of-mean: There should be sufficient amount of control and test values to detect the significance of change with a t-test. Technically there should be more than 3 controls and 3 tests, practically, they should be much more to provide statistical power. The threshold-for-data-significance should be used for a p-value threshold, or alternatively, fdr-threshold-for-data-significance should be used for controlling significance at the false discovery rate level.
 
+	significant-change-of-mean-paired: There should be sufficient amount of control and test values to detect the significance of change with a paired t-test. Technically there should be at least 3 controls and 3 tests, practically, they should be much more to provide statistical power. The order of control and test value columns indicate the pairing. First control column in the parameters file is paired with first test column, second is paired with second, etc. The threshold-for-data-significance should be used for a p-value threshold, or alternatively, fdr-threshold-for-data-significance should be used for controlling significance at the false discovery rate level.
+
+	signed-p-values: If the dataset has its own calculation of p-values desired to be used directly, then for each comparison, there must be a column in the dataset that has these p-values multiplied with the sign of the change. For instance a value -0.001 means downregulation with a p-value of 0.001. Don't use 0 and -0 values in the data file with this option. Java cannot distinguish between the two. Instead, convert 0 values to very small but nonzero values, such as 1e-10 or -1e-10. If an FDR control is desired, there are two ways to have it. First way is to use unadjusted p-values in the data file and then use the fdr-threshold-for-data-significance parameter to set the desired FDR level. Second way is to use adjusted p-values in the data file and use the threshold-for-data-significance parameter to set the FDR level. Don't mix these two ways. If fdr-threshold-for-data-significance is used over already-adjusted p-values, then the code will apply the Benjamini-Hochberg procedure over those already-adjusted p-values.
+
 	correlation: There should be one group of values (marked with value-column). There must be at least 3 value columns technically, but many more than that practically to have some statistical power for significant correlation. 
 
 
@@ -60,6 +66,8 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 `test-value-column`: Name of a test value column. This parameter should be used when there are control and test value columns in the dataset.
 
 `do-log-transform`: Whether the proteomic values should be log transformed for the analysis. Possible values are 'true' and 'false'. Default is false.
+
+`rna-expression-file`: Name of the RNA expression file. Simple tab-delimited text file where the first row has sample names, every other row corresponds to a gene, and first column is the gene symbol.
 
 `threshold-for-data-significance`: A threshold value for selecting significant data. Use this parameter only when FDR controlling procedure is already performed outside of CausalPath. This parameter can be set for each different data type separately. The parameter value has to be in the form 'thr-val data-type', such like '1 phosphoprotein' or '2 protein.
 
@@ -81,7 +89,7 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `minimum-sample-size`: When there are missing values in proteomic file, the comparisons can have different sample sizes for controls and tests. This parameter sets the minimum sample size of the control and test sets.
 
-`calculate-network-significance`: Whether to calculate significances of the properties of the graph. When turned on, a p-value for network size, and also downstream activity enrichment p-values for each gene on the graph are calculated.
+`calculate-network-significance`: Whether to calculate significances of the properties of the graph. When turned on, a p-value for network size, and also downstream activity enrichment p-values for each gene on the graph are calculated. This parameter is ignored by webserver due to resource limitations. To calculate network significance, please run CausalPath locally from its JAR file.
 
 `permutations-for-significance`: We will do data randomization to see if the result network is large, or any protein's downstream is enriched. This parameter indicates the number of randomizations we should perform. It should be reasonable high, such as 1000, but not too high.
 
@@ -89,7 +97,9 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `use-network-significance-for-causal-reasoning`: After calculation of network significances in a non-correlation-based analysis, this option introduces the detected active and inactive proteins as data to be used in the analysis. This applies only to the proteins that already have a changed data on them, and have no previous activity data associated.
 
-`minimum-potential-targets-to-consider-for-downstream-significance`: While calculating downstream significance for each source gene, we may not like to include those genes with just a few qualifying targets to reduce the number of tested hypotheses. These genes may not be significant even all their targets are in the results, and since we use Benjamini-Hochberg procedure to control false discovery rate from multiple hypothesis testing, their presence will hurt the statistical power. Use this parameter to exclude genes with few qualifying targets on the network. Default is 5.
+`prioritize-activity-data`: When there is an ActivityData associated to a protein (can be user hypothesis or inferred by network significance), do not use  other omic data for evidence of activity change in causal reasoning.
+
+`minimum-potential-targets-to-consider-for-downstream-significance`: While calculating downstream significance for each source gene, we may not like to include those genes with just a few qualifying targets to reduce the number of tested hypotheses. These genes may not be significant even all their targets are in the results, and since we use Benjamini-Hochberg procedure to control the false discovery rate from multiple hypothesis testing, their presence will hurt the statistical power. Use this parameter to exclude genes with few qualifying targets on the network. Default is 5.
 
 `do-site-matching`: Whether to force site matching in causality analysis. True by default.
 
@@ -107,9 +117,15 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 	IPTMNet: The IPTMNet database for phosphorylations.
 
+	RHOGEF: The experimental Rho - GEF relations.
+
+	PCTCGAConsensus: Unsigned PC relations whose signs are inferred by TCGA studies
+
 	TRRUST: The TRRUST database for expression relations.
 
 	TFactS: The TFactS database for expression relations.
+
+	NetworKIN: The NetworKIN database for phosphorylation relations.
 
 
 
@@ -120,6 +136,8 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 	phospho-only: Only phosphorylation relations are desired.
 
 	expression-only: Only expression relations are desired.
+
+	without-expression: Everything but expression relations are desired.
 
 	phospho-primary-expression-secondary: All phosphorylation relations are desired. Expression relations are desired only as supplemental, i.e., they have to involve at least one protein that exists in phospho graph.
 
@@ -156,3 +174,11 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 `custom-resource-directory`: CausalPath downloads some data in the first run and stores in the resource directory. This directory is '.panda' by default. If this needs to be customized, use this parameter.
 
 `tcga-directory`: It is possible to add genomic data from TCGA to CausalPath analysis. This is only useful when the proteomic data have the same sample IDs. Users can load TCGA data into a local directory from Broad Firehose, and provide the directory here. The org.panda.resource.tcga.BroadDownloader in the project https://github.com/PathwayAndDataAnalysis/resource is a utility that can do that.
+
+`hgnc-file`: For reproducibility: Provide an HGNC resource file to reproduce a previous analysis.
+
+`custom-causal-priors-file`: For reproducibility: Provide a custom file for causal priors.
+
+`custom-site-effects-file`: For reproducibility: Provide a custom file for site effects.
+
+`use-expression-for-activity-evidence`: For testing if RNA expression is a good proxy for protein activity.
