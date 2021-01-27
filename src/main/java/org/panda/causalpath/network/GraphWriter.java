@@ -4,6 +4,7 @@ import com.github.jsonldjava.utils.JsonUtils;
 import org.panda.causalpath.analyzer.NSCForNonCorr;
 import org.panda.causalpath.analyzer.NetworkSignificanceCalculator;
 import org.panda.causalpath.data.*;
+import org.panda.utility.ArrayUtil;
 import org.panda.utility.CollectionUtil;
 import org.panda.utility.FileUtil;
 import org.panda.utility.ValToColor;
@@ -477,18 +478,7 @@ public class GraphWriter
 
 			for (String sym : data.getGeneSymbols())
 			{
-				if (!geneMap.containsKey(sym))
-				{
-					HashMap<String, Object> node = new HashMap<>();
-					geneMap.put(sym, node);
-					nodes.add(node);
-					Map<String, Object> d = new HashMap<>();
-					node.put("data", d);
-					d.put("id", sym);
-					d.put("text", sym);
-					List<Map> sites = new ArrayList<>();
-					d.put("sites", sites);
-				}
+				initJsonNode(geneMap, nodes, sym);
 
 				Map node = geneMap.get(sym);
 
@@ -539,6 +529,134 @@ public class GraphWriter
 		BufferedWriter writer = Files.newBufferedWriter(Paths.get(filename));
 		JsonUtils.writePrettyPrint(writer, map);
 		writer.close();
+	}
+
+	/**
+	 * This method takes in a SIF graph defined by two files (.sif and .format), and generates a corresponding .json
+	 * file that the webserver can display.
+	 *
+	 * @param sifFileanme SIF filename
+	 * @param formatFilename Format filename
+	 * @param outJasonFilename JASON filename to produce
+	 */
+	public static void convertSIFToJSON(String sifFileanme, String formatFilename, String outJasonFilename) throws IOException
+	{
+		Map<String, Object> map = new HashMap<>();
+		List<Map> nodes = new ArrayList<>();
+		List<Map> edges = new ArrayList<>();
+		map.put("nodes", nodes);
+		map.put("edges", edges);
+
+		Map<String, Map> nodeMap = new HashMap<>();
+		Set<String> relMem = new HashSet<>();
+
+		Files.lines(Paths.get(sifFileanme)).map(l -> l.split("\t")).forEach(t ->
+		{
+			if (t.length > 2)
+			{
+				String key = t[0] + "\t" + t[1] + "\t" + t[2];
+				if (relMem.contains(key)) return;
+				else relMem.add(key);
+
+				Map<String, Object> edge = new HashMap<>();
+				edges.add(edge);
+				Map<String, Object> dMap = new HashMap<>();
+				edge.put("data", dMap);
+				dMap.put("source", t[0]);
+				dMap.put("target", t[2]);
+				dMap.put("edgeType", t[1]);
+				if (t.length > 4 && !t[4].trim().isEmpty())
+				{
+					dMap.put("tooltipText", t[2] + "-" + CollectionUtil.merge(Arrays.asList(t[4].split(";")), "-"));
+				}
+
+				if (t.length > 3 && !t[3].trim().isEmpty())
+				{
+					List<String> medList = Arrays.asList(t[3].split(";| "));
+					if (!medList.isEmpty())
+					{
+						dMap.put("pcLinks", medList);
+					}
+				}
+				initJsonNode(nodeMap, nodes, t[2]);
+			}
+
+			if (t.length > 0 && !t[0].isEmpty()) initJsonNode(nodeMap, nodes, t[0]);
+		});
+
+		Map<String, String> defaultColors = new HashMap<>();
+		String defBGCKey = "node BG color";
+		String defBorCKey = "node border color";
+
+		Files.lines(Paths.get(formatFilename)).map(l -> l.split("\t")).filter(t -> t.length > 3).forEach(t ->
+		{
+			if (t[1].equals("all-nodes"))
+			{
+				if (t[2].equals("color")) defaultColors.put(defBGCKey, jasonizeColor(t[3]));
+				else if (t[2].equals("bordercolor")) defaultColors.put(defBorCKey, jasonizeColor(t[3]));
+			}
+
+			if (t[0].equals("node"))
+			{
+				String name = t[1];
+				Map node = nodeMap.get(name);
+				if (node != null)
+				{
+					if (!node.containsKey("css")) node.put("css", new HashMap<>());
+
+					switch (t[2])
+					{
+						case "rppasite":
+							String[] x = t[3].split("\\|");
+							Map site = new HashMap();
+							((List) ((Map) node.get("data")).get("sites")).add(site);
+							site.put("siteText", x[1]);
+							site.put("siteInfo", x[0] + (x.length > 4 ? (" " + x[4]) : ""));
+							site.put("siteBackgroundColor", jasonizeColor(x[2]));
+							site.put("siteBorderColor", jasonizeColor(x[3]));
+							break;
+						case "color":
+							((Map) node.get("css")).put("backgroundColor", jasonizeColor(t[3]));
+							break;
+						case "bordercolor":
+							((Map) node.get("css")).put("borderColor", jasonizeColor(t[3]));
+							break;
+						case "borderwidth":
+							((Map) node.get("css")).put("borderWidth", t[3] + "px");
+							break;
+						case "tooltip":
+							((Map) node.get("data")).put("tooltipText", t[3]);
+							break;
+					}
+				}
+			}
+		});
+
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get(outJasonFilename));
+		JsonUtils.writePrettyPrint(writer, map);
+		writer.close();
+	}
+
+	private static void initJsonNode(Map<String, Map> nodeMap, List<Map> nodes, String name)
+	{
+		if (!nodeMap.containsKey(name))
+		{
+			HashMap<String, Object> node = new HashMap<>();
+			nodeMap.put(name, node);
+			nodes.add(node);
+			Map<String, Object> d = new HashMap<>();
+			node.put("data", d);
+			d.put("id", name);
+			d.put("text", name);
+			List<Map> sites = new ArrayList<>();
+			d.put("sites", sites);
+		}
+	}
+
+	private static String jasonizeColor(String c)
+	{
+		String[] t = c.split(" ");
+		return "rgb(" + ArrayUtil.getString(",", t[0], t[1], t[2]) + ")";
 	}
 
 	private Set<ExperimentData> getExperimentDataToDraw()

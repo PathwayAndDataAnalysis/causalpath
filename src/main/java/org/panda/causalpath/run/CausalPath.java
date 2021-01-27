@@ -1035,9 +1035,8 @@ public class CausalPath
 			"detection, using the threshold-for-data-significance.", false),
 
 		MAX("max", "The value with maximum absolute is used for the analysis. There should only be one group of " +
-			"values (marked with value-column), the values have to be distributed around " +
-			"zero, and a threshold value should be provided for significance detection, using the " +
-			"threshold-for-data-significance.", false),
+			"values (marked with value-column), the values have to be distributed around zero, and a threshold value " +
+			"should be provided for significance detection, using the threshold-for-data-significance.", false),
 
 		DIFFERENCE_OF_MEANS("difference-of-means", "There should be control and test values, whose difference would " +
 			"be used for significance detection. The threshold for significance (threshold-for-data-significance) " +
@@ -1052,13 +1051,13 @@ public class CausalPath
 		SIGNIFICANT_CHANGE_OF_MEAN("significant-change-of-mean", "There should be sufficient amount of control and " +
 			"test values to detect the significance of change with a t-test. Technically there should be more than 3" +
 			" controls and 3 tests, practically, they should be much more to provide statistical power. The " +
-			"threshold-for-data-significance should be used for a p-value threshold, or " +
-			"alternatively, fdr-threshold-for-data-significance should be used for " +
-			"controlling significance at the false discovery rate level.", true),
+			"threshold-for-data-significance should be used for a p-value threshold, or alternatively, " +
+			"fdr-threshold-for-data-significance should be used for controlling significance at the false discovery " +
+			"rate level.", true),
 
 		SIGNIFICANT_CHANGE_OF_MEAN_PAIRED("significant-change-of-mean-paired", "There should be sufficient amount of " +
 			"control and test values to detect the significance of change with a paired t-test. Technically there " +
-			"should be more than 3 controls and 3 tests, practically, they should be much more to provide statistical" +
+			"should be at least 3 controls and 3 tests, practically, they should be much more to provide statistical" +
 			" power. The order of control and test value columns indicate the pairing. First control column in the " +
 			"parameters file is paired with first test column, second is paired with second, etc. The " +
 			"threshold-for-data-significance should be used for a p-value threshold, or alternatively, " +
@@ -1068,11 +1067,18 @@ public class CausalPath
 		SIGNED_P_VALUES("signed-p-values", "If the dataset has its own calculation of p-values desired to be used " +
 			"directly, then for each comparison, there must be a column in the dataset that has these p-values " +
 			"multiplied with the sign of the change. For instance a value -0.001 means downregulation with a p-value " +
-			"of 0.001. If an FDR control is desired, then the p-values should not be adjusted.", false),
+			"of 0.001. Don't use 0 and -0 values in the data file with this option. Java cannot distinguish between " +
+			"the two. Instead, convert 0 values to very small but nonzero values, such as 1e-10 or -1e-10. " +
+			"If an FDR control is desired, there are two ways to have it. First way is to use unadjusted p-values in " +
+			"the data file and then use the fdr-threshold-for-data-significance parameter to set the desired FDR " +
+			"level. Second way is to use adjusted p-values in the data file and use the " +
+			"threshold-for-data-significance parameter to set the FDR level. Don't mix these two ways. " +
+			"If fdr-threshold-for-data-significance is used over already-adjusted p-values, then the code will apply " +
+			"the Benjamini-Hochberg procedure over those already-adjusted p-values.", false),
 
 		CORRELATION("correlation", "There should be one group of values (marked with value-column). There must be at " +
-			"least 3 value columns technically, but many more " +
-			"than that practically to have some statistical power for significant correlation. ", false);
+			"least 3 value columns technically, but many more than that practically to have some statistical power " +
+			"for significant correlation. ", false);
 
 		ValueTransformation(String name, String description, boolean twoGroupComparison)
 		{
@@ -1332,7 +1338,9 @@ public class CausalPath
 		CALCULATE_NETWORK_SIGNIFICANCE((value, cp) -> cp.calculateNetworkSignificance = webServerMode ? false : Boolean.valueOf(value),
 			"Calculate network significance",
 			"Whether to calculate significances of the properties of the graph. When turned on, a p-value for network" +
-				" size, and also downstream activity enrichment p-values for each gene on the graph are calculated.",
+				" size, and also downstream activity enrichment p-values for each gene on the graph are calculated. " +
+				"This parameter is ignored by webserver due to resource limitations. To calculate network significance, " +
+				"please run CausalPath locally from its JAR file.",
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false, new Cond(Logical.NOT)),
 		PERMUTATIONS_FOR_SIGNIFICANCE((value, cp) -> cp.permutationCount = Integer.valueOf(value),
 			"Number of permutations for calculating network significance",
@@ -1410,7 +1418,7 @@ public class CausalPath
 			new String[]{NetworkLoader.ResourceType.PC.name()},
 			new String[]{NetworkLoader.ResourceType.PhosphoNetworks.name()},
 			new String[]{NetworkLoader.ResourceType.IPTMNet.name()}},
-			true, true, null),
+			false, true, null),
 		RELATION_FILTER_TYPE((value, cp) ->
 		{
 			if (!cp.cs.hasGraphFilter())
@@ -1453,7 +1461,7 @@ public class CausalPath
 			"Specifies the value where node colors reach most intense color. Has to be a positive value, and used " +
 				"symmetrically. In the case of value-transformation is significant-change-of-mean, the value is " +
 				"-log(p) with a sign associated to it.",
-			new EntryType(Double.class), new String[][]{{"1"}}, false, false,
+			new EntryType(Double.class), new String[][]{{"10"}}, false, false,
 			new Cond( Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		SHOW_ALL_GENES_WITH_PROTEOMIC_DATA((value, cp) -> cp.showAllGenesWithProteomicData = Boolean.valueOf(value),
 			"Show all genes with significant proteomic data",
