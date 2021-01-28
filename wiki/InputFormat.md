@@ -5,6 +5,8 @@ Users need to prepare a minimum of 2 text files to run a CausalPath analysis.
 1. Proteomics data
 2. Analysis parameters
 
+An example set of input files is available [here](https://github.com/PathwayAndDataAnalysis/causalpath/raw/master/wiki/sample-data-and-parameters.zip).
+
 ## Proteomics data
 
 CausalPath reads the proteomics dataset from a tab-delimited text file where the first row contains the column headers. Below are description of those columns.
