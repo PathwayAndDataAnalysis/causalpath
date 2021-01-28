@@ -1,6 +1,7 @@
 package org.panda.causalpath.run;
 
 import org.panda.causalpath.network.GraphWriter;
+import org.panda.utility.FileUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +32,7 @@ public class JasonizeResultGraphsRecursively
 		String sifPath = inDir + File.separator + sifName + ".sif";
 		String formatPath = inDir + File.separator + sifName + ".format";
 
-		if (Files.exists(Paths.get(sifPath)) && Files.exists(Paths.get(formatPath)))
+		if (Files.exists(Paths.get(sifPath)) && !FileUtil.isEmpty(sifPath) && Files.exists(Paths.get(formatPath)))
 		{
 			String outDir = inDir.replace(inBase, outBase);
 			Files.createDirectories(Paths.get(outDir));
