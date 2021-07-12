@@ -1,0 +1,16 @@
+proteomics-values-file = data_causalpath.txt
+id-column = ID
+symbols-column = Symbols
+sites-column = Sites
+effect-column = Effect
+value-transformation = signed-p-values
+value-column = SignedP
+threshold-for-data-significance = 0.1 phosphoprotein
+calculate-network-significance = true
+permutations-for-significance = 10000
+fdr-threshold-for-network-significance = 0.1
+use-network-significance-for-causal-reasoning = true
+minimum-potential-targets-to-consider-for-downstream-significance = 5
+color-saturation-value = 10
+show-all-genes-with-proteomic-data = false
+gene-activity = GP6 a
