@@ -19,7 +19,6 @@ reformatted_dat <- data.frame(ID=character(0), Symbols=character(0),
 pb <- txtProgressBar(min=1, max=nrow(dat), style=3)
 for(i in 1:nrow(dat)) {
   setTxtProgressBar(pb, i)
-  #i <- 1
 
   gene_symbol <- dat$`UniProt Gene Name`[i]
   
@@ -43,5 +42,5 @@ for(i in 1:nrow(dat)) {
 stopifnot(nrow(dat) == nrow(reformatted_dat))
 
 # SAVE RESULTS ----
-write.table(reformatted_dat, "data_causalpath_tmp.txt", sep="\t", 
+write.table(reformatted_dat, "data_causalpath.txt", sep="\t", 
             row.names=FALSE, quote=FALSE)
