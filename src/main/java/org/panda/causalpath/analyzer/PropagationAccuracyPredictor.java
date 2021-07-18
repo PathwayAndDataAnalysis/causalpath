@@ -44,7 +44,7 @@ public class PropagationAccuracyPredictor
 		Map<ExperimentData, Set<ExperimentData>> map = new HashMap<>();
 		for (Relation rel : results)
 		{
-			for (ExperimentData target : cs.getExplainableTargetData(rel))
+			for (ExperimentData target : cs.getExplainableTargetDataWithSiteMatch(rel))
 			{
 				if (!(target instanceof ProteinData)) continue;
 

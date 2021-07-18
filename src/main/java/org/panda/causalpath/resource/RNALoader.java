@@ -37,7 +37,7 @@ public class RNALoader
 	public RNALoader(String filename) throws IOException
 	{
 		reader = new MatrixOfValuesDatasetReader(filename);
-		reader.load(null);
+		reader.load();
 		Set<String> samples = reader.getSamples();
 		this.samples = samples.toArray(new String[samples.size()]);
 		dataCache = new HashMap<>();

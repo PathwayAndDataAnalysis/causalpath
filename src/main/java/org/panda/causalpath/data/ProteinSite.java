@@ -1,9 +1,9 @@
 package org.panda.causalpath.data;
 
 /**
- * A phosphorylation site of a protein.
+ * A site of a protein subject to a modification.
  */
-public class PhosphoSite
+public class ProteinSite
 {
 	/**
 	 * Location on the protein.
@@ -20,7 +20,7 @@ public class PhosphoSite
 	 */
 	protected String aa;
 
-	public PhosphoSite(int site, String aa, int effect)
+	public ProteinSite(int site, String aa, int effect)
 	{
 		this.site = site;
 		this.aa = aa;
@@ -47,6 +47,6 @@ public class PhosphoSite
 	@Override
 	public boolean equals(Object obj)
 	{
-		return obj instanceof PhosphoSite && aa.equals(((PhosphoSite) obj).aa) && site == ((PhosphoSite) obj).site;
+		return obj instanceof ProteinSite && aa.equals(((ProteinSite) obj).aa) && site == ((ProteinSite) obj).site;
 	}
 }

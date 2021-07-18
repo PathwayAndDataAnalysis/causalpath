@@ -17,30 +17,41 @@ import java.util.stream.Collectors;
  *
  * @author Ozgun Babur
  */
-public class DownstreamCounter
+public class DownstreamCounterForComparison extends DownstreamCounterForCorrelation
 {
-	CausalitySearcher cs;
+	Map<Relation, Set<ExperimentData>> rel2Datas;
 
-	public DownstreamCounter(CausalitySearcher cs)
+	public DownstreamCounterForComparison(CausalitySearcher cs, Set<Relation> relations)
 	{
-		this.cs = cs;
+		super(cs);
+
+		rel2Datas = new HashMap<>();
+		for (Relation rel : relations)
+		{
+			rel2Datas.put(rel, cs.getExplainableTargetDataWithSiteMatch(rel));
+		}
 	}
 
-	public Map<String, Integer>[] run(Set<Relation> relations)
+	public Map<String, Integer>[] run()
 	{
 		Map<String, Set<String>> total = new HashMap<>();
 		Map<String, Set<String>> activ = new HashMap<>();
 		Map<String, Set<String>> inhib = new HashMap<>();
 
+		Set<Relation> relations = rel2Datas.keySet();
+
 		relations.forEach(r ->
 		{
-			Set<ExperimentData> td = cs.getExplainableTargetData(r);
+			Set<ExperimentData> td = rel2Datas.get(r);
 
 			if (!td.isEmpty())
 			{
-				if (!total.containsKey(r.source)) total.put(r.source, new HashSet<>());
-				if (!activ.containsKey(r.source)) activ.put(r.source, new HashSet<>());
-				if (!inhib.containsKey(r.source)) inhib.put(r.source, new HashSet<>());
+				if (!total.containsKey(r.source))
+				{
+					total.put(r.source, new HashSet<>());
+					activ.put(r.source, new HashSet<>());
+					inhib.put(r.source, new HashSet<>());
+				}
 			}
 
 			td.forEach(d ->
@@ -66,15 +77,10 @@ public class DownstreamCounter
 		return new Map[]{convertToCounts(total), convertToCounts(activ), convertToCounts(inhib)};
 	}
 
-	protected Map<String, Integer> convertToCounts(Map<String, Set<String>> map)
-	{
-		return map.keySet().stream().collect(Collectors.toMap(s -> s, s -> map.get(s).size()));
-	}
-
 	public Map<String, Integer> getGenesPotentialDownstreamMax(Set<Relation> relations)
 	{
 		Map<String, Set<String>> map = new HashMap<>();
-		relations.stream().filter(cs::hasConsiderableData).forEach(r ->
+		relations.stream().filter(cs::hasConsiderableDownstreamData).forEach(r ->
 		{
 			if (!map.containsKey(r.source)) map.put(r.source, new HashSet<>());
 			map.get(r.source).add(r.target);
@@ -85,11 +91,10 @@ public class DownstreamCounter
 
 	public Set<String> getGenesWithNoPotential(Set<Relation> relations)
 	{
-		Set<String> consider = relations.stream().filter(cs::hasConsiderableData).map(r -> r.source)
+		Set<String> consider = relations.stream().filter(cs::hasConsiderableDownstreamData).map(r -> r.source)
 			.collect(Collectors.toSet());
 
 		return relations.stream().map(r -> r.source).filter(gene -> !consider.contains(gene))
 			.collect(Collectors.toSet());
 	}
-
 }

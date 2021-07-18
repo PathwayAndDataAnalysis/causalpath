@@ -52,7 +52,7 @@ public class TCGALoader
 	private Map<String, Set<ExperimentData>> dataCache;
 
 	/**
-	 * This set of genes are used to ignore RNA expression, CNA or methylation data when there is a total protein
+	 * This set of genes are used to ignore RNA expression, DNA_CNA or methylation data when there is a total protein
 	 * measurement exists.
 	 *
 	 */
@@ -121,7 +121,7 @@ public class TCGALoader
 			Set<ProteomicsFileRow> rowSet = rppaReader.getAssociatedData(symbol, samples);
 
 			rowSet.stream().filter(row -> !rppaCache.containsKey(row.id)).forEach(row -> {
-				ProteinData d = row.isPhospho() ? new PhosphoProteinData(row) : new ProteinData(row);
+				ProteinData d = row.isSiteSpecific() ? new SiteModProteinData(row) : new ProteinData(row);
 				rppaCache.put(d.id, d);
 			});
 
@@ -235,7 +235,7 @@ public class TCGALoader
 		String[] samples = new String[]{sampleSet.iterator().next()};
 
 		rppaReader.getGenes().stream().forEach(gene ->
-			rppaReader.getAssociatedData(gene, samples).stream().filter(data -> !data.isPhospho())
+			rppaReader.getAssociatedData(gene, samples).stream().filter(data -> !data.isSiteSpecific())
 				.forEach(data -> genes.addAll(data.genes)));
 
 		return genes;

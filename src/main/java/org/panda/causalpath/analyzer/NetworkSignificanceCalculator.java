@@ -46,6 +46,7 @@ public abstract class NetworkSignificanceCalculator
 	{
 		this.relations = relations;
 		this.cs = cs;
+		cs.initRelationDataMappingMemory();
 		this.minimumPotentialTargetsToConsider = 0;
 	}
 

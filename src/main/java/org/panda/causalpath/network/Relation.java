@@ -3,8 +3,7 @@ package org.panda.causalpath.network;
 import org.panda.causalpath.analyzer.TwoDataChangeDetector;
 import org.panda.causalpath.data.ExperimentData;
 import org.panda.causalpath.data.GeneWithData;
-import org.panda.causalpath.data.PhosphoSite;
-import org.panda.resource.siteeffect.SiteEffectCollective;
+import org.panda.causalpath.data.ProteinSite;
 import org.panda.utility.CollectionUtil;
 
 import java.util.Arrays;
@@ -57,7 +56,13 @@ public class Relation
 	/**
 	 * Sites for the target. Needed when the relation is a phosphorylation or dephosphorylation.
 	 */
-	public Set<PhosphoSite> sites;
+	public Set<ProteinSite> sites;
+
+	/**
+	 * For performance reasons. This design assumes the proximityThreshold will not change during execution of the
+	 * program.
+	 */
+	private Set<String> targetWithSites;
 
 	public Relation(String source, String target, RelationType type, String mediators)
 	{
@@ -76,7 +81,7 @@ public class Relation
 		if (token.length > 3) this.mediators = token[3];
 		if (token.length > 4)
 		{
-			sites = Arrays.stream(token[4].split(";")).map(s -> new PhosphoSite(Integer.valueOf(s.substring(1)),
+			sites = Arrays.stream(token[4].split(";")).map(s -> new ProteinSite(Integer.valueOf(s.substring(1)),
 				String.valueOf(s.charAt(0)), 0)).collect(Collectors.toSet());
 		}
 	}
@@ -101,17 +106,24 @@ public class Relation
 
 	public Set<String> getTargetWithSites(int proximityThr)
 	{
-		if (sites == null) return Collections.emptySet();
-		Set<String> set = new HashSet<>();
-		for (PhosphoSite site : sites)
+		if (targetWithSites == null)
 		{
-			for (int i = 0; i <= proximityThr; i++)
+			targetWithSites = new HashSet<>();
+
+			if (sites != null)
 			{
-				set.add(target + "_" + (site.getSite() + i));
-				set.add(target + "_" + (site.getSite() - i));
+				for (ProteinSite site : sites)
+				{
+					for (int i = 0; i <= proximityThr; i++)
+					{
+						targetWithSites.add(target + "_" + (site.getSite() + i));
+						targetWithSites.add(target + "_" + (site.getSite() - i));
+					}
+				}
 			}
 		}
-		return set;
+
+		return targetWithSites;
 	}
 
 	public String getSitesInString()

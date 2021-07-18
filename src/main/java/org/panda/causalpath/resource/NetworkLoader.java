@@ -1,15 +1,15 @@
 package org.panda.causalpath.resource;
 
 import org.panda.causalpath.data.GeneWithData;
-import org.panda.causalpath.data.PhosphoSite;
+import org.panda.causalpath.data.ProteinSite;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationType;
+import org.panda.resource.HGNC;
 import org.panda.resource.network.*;
 import org.panda.resource.signednetwork.SignedType;
-import org.panda.resource.siteeffect.SiteEffectCollective;
 import org.panda.utility.CollectionUtil;
 import org.panda.utility.graph.DirectedGraph;
-import org.panda.utility.graph.PhosphoGraph;
+import org.panda.utility.graph.SiteSpecificGraph;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
@@ -28,8 +28,8 @@ public class NetworkLoader
 	 */
 	public static Set<Relation> load()
 	{
-		return load(new HashSet<>(Arrays.asList(ResourceType.PC, ResourceType.PhosphoNetworks, ResourceType.IPTMNet,
-			ResourceType.TRRUST, ResourceType.TFactS)));
+		return load(new HashSet<>(Arrays.asList(ResourceType.PC, ResourceType.PhosphoSitePlus,
+			ResourceType.PhosphoNetworks, ResourceType.IPTMNet, ResourceType.TRRUST, ResourceType.TFactS, ResourceType.PCMetabolic)));
 	}
 
 	/**
@@ -47,6 +47,12 @@ public class NetworkLoader
 			mergeSecondMapIntoFirst(allGraphs, SignedPC.get().getAllGraphs());
 		}
 
+		// Add PhosphoSitePlus
+		if (resourceTypes.contains(ResourceType.PhosphoSitePlus))
+		{
+			mergeSecondMapIntoFirst(allGraphs, PhosphoSitePlus.get().getAllGraphs());
+		}
+
 		// Add REACH
 		if (resourceTypes.contains(ResourceType.REACH))
 		{
@@ -56,7 +62,7 @@ public class NetworkLoader
 		// Add IPTMNet
 		if (resourceTypes.contains(ResourceType.IPTMNet))
 		{
-			addGraph(allGraphs, SignedType.PHOSPHORYLATES, IPTMNet.get().getGraph());
+			mergeSecondMapIntoFirst(allGraphs, IPTMNet.get().getAllGraphs());
 		}
 
 		// Add PhosphoNetworks
@@ -103,11 +109,27 @@ public class NetworkLoader
 			addGraph(allGraphs, SignedType.DOWNREGULATES_EXPRESSION, TFactS.get().getNegativeGraph());
 		}
 
+		// Add PC Metabolic
+		if (resourceTypes.contains(ResourceType.PCMetabolic))
+		{
+			addGraph(allGraphs, SignedType.PRODUCES, SignedMetabolic.getGraph(SignedType.PRODUCES));
+			addGraph(allGraphs, SignedType.CONSUMES, SignedMetabolic.getGraph(SignedType.CONSUMES));
+			addGraph(allGraphs, SignedType.USED_TO_PRODUCE, SignedMetabolic.getGraph(SignedType.USED_TO_PRODUCE));
+		}
+
+		// Clean-up conflicts
+		cleanUpConflicts(allGraphs);
+
 		// Generate relations based on the network
 
 		for (SignedType signedType : allGraphs.keySet())
 		{
 			DirectedGraph graph = allGraphs.get(signedType);
+			if (graph == null)
+			{
+//				System.out.println("Null graph for type: " + signedType);
+				continue;
+			}
 
 			// take a subset of the network for debugging
 //			graph.crop(Arrays.asList("HCK", "CD247"));
@@ -125,13 +147,20 @@ public class NetworkLoader
 						case DOWNREGULATES_EXPRESSION: type = RelationType.DOWNREGULATES_EXPRESSION; break;
 						case ACTIVATES_GTPASE: type = RelationType.ACTIVATES_GTPASE; break;
 						case INHIBITS_GTPASE: type = RelationType.INHIBITS_GTPASE; break;
+						case ACETYLATES: type = RelationType.ACETYLATES; break;
+						case DEACETYLATES: type = RelationType.DEACETYLATES; break;
+						case DEMETHYLATES: type = RelationType.DEMETHYLATES; break;
+						case METHYLATES: type = RelationType.METHYLATES; break;
+						case PRODUCES: type = RelationType.PRODUCES; break;
+						case CONSUMES: type = RelationType.CONSUMES; break;
+						case USED_TO_PRODUCE: type = RelationType.USED_TO_PRODUCE; break;
 						default: throw new RuntimeException("Is there a new type??");
 					}
 					Relation rel = new Relation(source, target, type, graph.getMediatorsInString(source, target));
 
-					if (graph instanceof PhosphoGraph)
+					if (graph instanceof SiteSpecificGraph)
 					{
-						PhosphoGraph pGraph = (PhosphoGraph) graph;
+						SiteSpecificGraph pGraph = (SiteSpecificGraph) graph;
 						Set<String> sites = pGraph.getSites(source, target);
 						if (sites != null && !sites.isEmpty())
 						{
@@ -139,8 +168,11 @@ public class NetworkLoader
 
 							for (String site : sites)
 							{
-								rel.sites.add(new PhosphoSite(Integer.parseInt(site.substring(1)),
-									site.substring(0, 1), 0));
+								if (!site.isEmpty())
+								{
+									rel.sites.add(new ProteinSite(Integer.parseInt(site.substring(1)),
+										site.substring(0, 1), 0));
+								}
 							}
 						}
 					}
@@ -150,11 +182,31 @@ public class NetworkLoader
 			}
 		}
 
+		// clean from non-HGNC
+
+		relations = relations.stream().filter(r -> (r.source.startsWith("CHEBI:") || HGNC.get().getSymbol(r.source) != null) &&
+			(r.target.startsWith("CHEBI:") || HGNC.get().getSymbol(r.target) != null)).collect(Collectors.toSet());
+
 		// initiate source and target data
 
 		initSourceTargetData(relations);
 
 		return relations;
+	}
+
+	private static void check(Map<SignedType, DirectedGraph> allGraphs)
+	{
+		DirectedGraph graph = allGraphs.get(SignedType.DEPHOSPHORYLATES);
+		if (graph != null)
+		{
+			Set<String> dwns = graph.getDownstream("ABL1");
+			if (dwns.contains("RB1"))
+			{
+				System.out.println("Here it is!!!");
+			}
+			else System.out.println("Nope");
+		}
+		else System.out.println("No graph");
 	}
 
 	public static Set<Relation> load(String customFile) throws IOException
@@ -197,17 +249,87 @@ public class NetworkLoader
 		else allGraphs.put(type, graph);
 	}
 
+	private static void cleanUpConflicts(Map<SignedType, DirectedGraph> graphs)
+	{
+		cleanUpConflicts((SiteSpecificGraph) graphs.get(SignedType.PHOSPHORYLATES), (SiteSpecificGraph) graphs.get(SignedType.DEPHOSPHORYLATES));
+		cleanUpConflicts((SiteSpecificGraph) graphs.get(SignedType.ACETYLATES), (SiteSpecificGraph) graphs.get(SignedType.DEACETYLATES));
+		cleanUpConflicts((SiteSpecificGraph) graphs.get(SignedType.METHYLATES), (SiteSpecificGraph) graphs.get(SignedType.DEMETHYLATES));
+		cleanUpConflicts(graphs.get(SignedType.UPREGULATES_EXPRESSION), graphs.get(SignedType.DOWNREGULATES_EXPRESSION));
+		cleanUpConflicts(graphs.get(SignedType.ACTIVATES_GTPASE), graphs.get(SignedType.INHIBITS_GTPASE));
+	}
+
+	private static void cleanUpConflicts(DirectedGraph graph1, DirectedGraph graph2)
+	{
+		Set<String[]> rem1 = new HashSet<>();
+		Set<String[]> rem2 = new HashSet<>();
+
+		for (String source : graph1.getOneSideSymbols(true))
+		{
+			for (String target : graph1.getDownstream(source))
+			{
+				if (graph2.hasRelation(source, target))
+				{
+					String[] rel = new String[]{source, target};
+					long c1 = paperCnt(graph1.getMediators(source, target));
+					long c2 = paperCnt(graph2.getMediators(source, target));
+
+					if (c1 >= c2) rem2.add(rel);
+					if (c2 >= c1) rem1.add(rel);
+				}
+			}
+		}
+
+		rem1.forEach(rel -> graph1.removeRelation(rel[0], rel[1]));
+		rem2.forEach(rel -> graph2.removeRelation(rel[0], rel[1]));
+	}
+
+	private static void cleanUpConflicts(SiteSpecificGraph graph1, SiteSpecificGraph graph2)
+	{
+		for (String source : graph1.getOneSideSymbols(true))
+		{
+			for (String target : graph1.getDownstream(source))
+			{
+				if (graph2.hasRelation(source, target))
+				{
+					Set<String> s1 = graph1.getSites(source, target);
+					Set<String> s2 = graph1.getSites(source, target);
+
+					Set<String> common = CollectionUtil.getIntersection(s1, s2);
+
+					if (!common.isEmpty())
+					{
+						long c1 = paperCnt(graph1.getMediators(source, target));
+						long c2 = paperCnt(graph2.getMediators(source, target));
+
+						for (String site : common)
+						{
+							if (c1 >= c2) graph2.removeSite(source, target, site);
+							if (c2 >= c1) graph1.removeSite(source, target, site);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	private static long paperCnt(Set<String> mediators)
+	{
+		return mediators.stream().filter(s -> s.startsWith("PMID:")).distinct().count();
+	}
+
 	public enum ResourceType
 	{
 		PC("Pathway Commons v9 for all kinds of relations."),
+		PhosphoSitePlus("PhosphoSitePlus database for (de)phosphorylations, (de)acetylations and (de)methylations."),
 		REACH("Network derived from REACH NLP extraction results for phosphorylation relations."),
 		PhosphoNetworks("The PhosphoNetworks database for phosphorylations."),
 		IPTMNet("The IPTMNet database for phosphorylations."),
 		RHOGEF("The experimental Rho - GEF relations."),
-		PCTCGAConsensus("Unsigned PC relations whose signs are inferred by TCGA studies"),
+		PCTCGAConsensus("Unsigned PC relations whose signs are inferred by TCGA studies."),
 		TRRUST("The TRRUST database for expression relations."),
 		TFactS("The TFactS database for expression relations."),
 		NetworKIN("The NetworKIN database for phosphorylation relations."),
+		PCMetabolic("Relations involving chemicals in PC"),
 		;
 
 		String description;
@@ -276,7 +398,7 @@ public class NetworkLoader
 	{
 		Set<Relation> rels = NetworkLoader.load();
 
-		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/ozgun/Documents/Temp/causal-priors.txt"));
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/Users/ozgun/Documents/Temp/causal-priors.txt"));
 
 		for (Relation rel : rels)
 		{
@@ -289,7 +411,7 @@ public class NetworkLoader
 	public static void writeSitesWithUpstream() throws IOException
 	{
 		Set<Relation> rels = NetworkLoader.load(new HashSet<>(Arrays.asList(ResourceType.PC, ResourceType.PhosphoNetworks)));
-		Map<String, Set<PhosphoSite>> map = new HashMap<>();
+		Map<String, Set<ProteinSite>> map = new HashMap<>();
 		for (Relation rel : rels)
 		{
 			if (rel.sites != null)
@@ -302,7 +424,7 @@ public class NetworkLoader
 
 		for (String gene : map.keySet())
 		{
-			Set<PhosphoSite> sites = map.get(gene);
+			Set<ProteinSite> sites = map.get(gene);
 			writer.write("\n" + gene + "\t");
 			writer.write(CollectionUtil.merge(sites, " "));
 		}
@@ -310,8 +432,4 @@ public class NetworkLoader
 		writer.close();
 	}
 
-	public static void writeRelationsToFile()
-	{
-
-	}
 }

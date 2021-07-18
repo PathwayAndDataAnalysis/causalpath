@@ -44,7 +44,7 @@ public class CausalitySearcher implements Cloneable
 	/**
 	 * The interesting subset of phosphorylation data with unknown effect.
 	 */
-	private Set<PhosphoProteinData> dataNeedsAnnotation;
+	private Set<SiteModProteinData> dataNeedsAnnotation;
 
 	/**
 	 * When this is true, the data that are used for inference of causality or conflict are saved in a set.
@@ -92,6 +92,9 @@ public class CausalitySearcher implements Cloneable
 	 */
 	GraphFilter graphFilter;
 
+	Map<Relation, Set<ExperimentData>> affectingSourceDataMap;
+	Map<Relation, Set<ExperimentData>> explainableTargetDataMap;
+
 	/**
 	 * Constructor with the reasoning type.
 	 * @param causal true:causal, false:conflicting
@@ -106,8 +109,14 @@ public class CausalitySearcher implements Cloneable
 		this.mandateActivityDataUpstreamOfExpression = false;
 		this.useStrongestProteomicsDataForActivity = false;
 
-		this.generalActivityChangeIndicators = new HashSet<>(Arrays.asList(
-			DataType.PROTEIN, DataType.PHOSPHOPROTEIN, DataType.ACTIVITY));
+		this.generalActivityChangeIndicators = new HashSet<>(Arrays.asList(DataType.PROTEIN, DataType.PHOSPHOPROTEIN,
+			DataType.ACETYLPROTEIN, DataType.METHYLPROTEIN, DataType.METABOLITE, DataType.ACTIVITY));
+	}
+
+	public void initRelationDataMappingMemory()
+	{
+		this.affectingSourceDataMap = new HashMap<>();
+		this.explainableTargetDataMap = new HashMap<>();
 	}
 
 	public CausalitySearcher copy()
@@ -190,12 +199,20 @@ public class CausalitySearcher implements Cloneable
 	public boolean satisfiesCriteria(Relation relation)
 	{
 		// Get data of target gene this relation can explain the change
-		Set<ExperimentData> td = getExplainableTargetData(relation);
+		if (explainableTargetDataMap != null && !explainableTargetDataMap.containsKey(relation))
+			explainableTargetDataMap.put(relation, getExplainableTargetDataWithSiteMatch(relation));
+
+		Set<ExperimentData> td = explainableTargetDataMap == null ?
+			getExplainableTargetDataWithSiteMatch(relation) : explainableTargetDataMap.get(relation);
 
 		if (!td.isEmpty())
 		{
 			// Get data of the source gene that can be cause of this relation
-			Set<ExperimentData> sd = getAffectingSourceData(relation);
+			if (affectingSourceDataMap != null && !affectingSourceDataMap.containsKey(relation))
+				affectingSourceDataMap.put(relation, getAffectingSourceData(relation));
+
+			Set<ExperimentData> sd = affectingSourceDataMap == null ?
+				getAffectingSourceData(relation) : affectingSourceDataMap.get(relation);
 
 			if (!sd.isEmpty())
 			{
@@ -207,25 +224,30 @@ public class CausalitySearcher implements Cloneable
 
 	/**
 	 * Checks if the relation has potential to explain/conflict with the associated data to source and targets, but
-	 * without evaluating data values or site effect.
+	 * without evaluating data values.
+	 *
+	 * @param relation relation to check
+	 * @return true if the relation has considerable data at both sides
+	 */
+	public boolean hasConsiderableDownstreamData(Relation relation)
+	{
+		return !getExplainableTargetDataWithSiteMatch(relation).isEmpty();
+	}
+
+	/**
+	 * Checks if the relation has potential to explain/conflict with the associated data to source and targets, but
+	 * without evaluating data values.
 	 *
 	 * @param relation relation to check
 	 * @return true if the relation has considerable data at both sides
 	 */
 	public boolean hasConsiderableData(Relation relation)
 	{
-		// Get data of target gene this relation can explain the change
-		Set<ExperimentData> td = getExplainableTargetData(relation);
-
-		if (!td.isEmpty())
+		if (hasConsiderableDownstreamData(relation))
 		{
 			// Get data of the source gene that can be cause of this relation
 			Set<ExperimentData> sd = getAffectingSourceData(relation);
-
-			if (!sd.isEmpty())
-			{
-				return true;
-			}
+			return !sd.isEmpty();
 		}
 		return false;
 	}
@@ -268,7 +290,7 @@ public class CausalitySearcher implements Cloneable
 
 		if (e != 0 && collectDataWithMissingEffect && sourceData.getEffect() == 0)
 		{
-			dataNeedsAnnotation.add((PhosphoProteinData) sourceData);
+			dataNeedsAnnotation.add((SiteModProteinData) sourceData);
 		}
 		else if (sourceData.getEffect() * e == causal)
 		{
@@ -312,8 +334,7 @@ public class CausalitySearcher implements Cloneable
 	{
 		if (rel.type.affectsPhosphoSite)
 		{
-			return getEvidenceForPhosphoChange(rel.targetData).stream()
-				.filter(d -> isPhosphoTargetCompatible(rel, (PhosphoProteinData) d)).collect(Collectors.toSet());
+			return getEvidenceForPhosphoChange(rel.targetData);
 		}
 		else if (rel.type.affectsTotalProt)
 		{
@@ -323,9 +344,36 @@ public class CausalitySearcher implements Cloneable
 		{
 			return getEvidenceForGTPaseChange(rel.targetData);
 		}
+		else if (rel.type.affectsAcetylSite)
+		{
+			return getEvidenceForAcetylChange(rel.targetData);
+		}
+		else if (rel.type.affectsMethlSite)
+		{
+			return getEvidenceForMethylChange(rel.targetData);
+		}
+		else if (rel.type.affectsMetabolite)
+		{
+			return getEvidenceForMetaboliteChange(rel.targetData);
+		}
 
 		throw new RuntimeException("Code should not reach here. Is there a new relation type to handle?");
 	}
+
+	/**
+	 * Gets the set of target data that the given relation can potentially explain its change. That is without
+	 * checking the value changes, but site matching (if relevant) is evaluated.
+	 * @param rel the relation
+	 * @return the set of target data explainable by the relation
+	 */
+	public Set<ExperimentData> getExplainableTargetDataWithSiteMatch(Relation rel)
+	{
+		Set<ExperimentData> datas = getExplainableTargetData(rel);
+
+		return datas.stream().filter(d -> !(d instanceof SiteModProteinData) ||
+			isTargetSiteCompatible(rel, (SiteModProteinData) d)).collect(Collectors.toSet());
+	}
+
 
 	/**
 	 * Checks if target sites match for the relation and the data.
@@ -333,10 +381,10 @@ public class CausalitySearcher implements Cloneable
 	 * @param target target data
 	 * @return true if there is a match or no match needed
 	 */
-	public boolean isPhosphoTargetCompatible(Relation rel, PhosphoProteinData target)
+	public boolean isTargetSiteCompatible(Relation rel, SiteModProteinData target)
 	{
 		return !forceSiteMatching || !CollectionUtil.intersectionEmpty(
-			rel.getTargetWithSites(siteProximityThreshold), target.getGenesWithSites());
+				rel.getTargetWithSites(siteProximityThreshold), target.getGenesWithSites());
 	}
 
 	/**
@@ -347,9 +395,9 @@ public class CausalitySearcher implements Cloneable
 	 */
 	public Set<ExperimentData> getAffectingSourceData(Relation rel)
 	{
-		if (rel.type.affectsPhosphoSite)
+		if (rel.type.affectsPhosphoSite || rel.type.affectsAcetylSite || rel.type.affectsMethlSite)
 		{
-			return getUpstreamEvidenceForPhosphoChange(rel.sourceData);
+			return getUpstreamEvidenceForSiteSpecificChange(rel.sourceData);
 		}
 		else if (rel.type.affectsTotalProt)
 		{
@@ -358,6 +406,10 @@ public class CausalitySearcher implements Cloneable
 		else if (rel.type.affectsGTPase)
 		{
 			return getUpstreamEvidenceForGTPaseChange(rel.sourceData);
+		}
+		else if (rel.type.affectsMetabolite)
+		{
+			return getUpstreamEvidenceForMetaboliteChange(rel.sourceData);
 		}
 
 		throw new RuntimeException("Code should not reach here. There must be a new relation type to handle.");
@@ -378,6 +430,8 @@ public class CausalitySearcher implements Cloneable
 			set.addAll(gene.getData(type));
 		}
 
+		set = set.stream().filter(d -> d.getEffect() != 0).collect(Collectors.toSet());
+
 		if (useStrongestProteomicsDataForActivity)
 		{
 			removeShadowedProteomicData(set);
@@ -391,7 +445,7 @@ public class CausalitySearcher implements Cloneable
 		return set;
 	}
 
-	public Set<ExperimentData> getUpstreamEvidenceForPhosphoChange(GeneWithData gene)
+	public Set<ExperimentData> getUpstreamEvidenceForSiteSpecificChange(GeneWithData gene)
 	{
 		return getGeneralActivationEvidence(gene);
 	}
@@ -403,6 +457,11 @@ public class CausalitySearcher implements Cloneable
 	}
 
 	public Set<ExperimentData> getUpstreamEvidenceForGTPaseChange(GeneWithData gene)
+	{
+		return getGeneralActivationEvidence(gene);
+	}
+
+	public Set<ExperimentData> getUpstreamEvidenceForMetaboliteChange(GeneWithData gene)
 	{
 		return getGeneralActivationEvidence(gene);
 	}
@@ -422,6 +481,22 @@ public class CausalitySearcher implements Cloneable
 	{
 		return gene.getData(DataType.ACTIVITY);
 	}
+
+	public Set<ExperimentData> getEvidenceForAcetylChange(GeneWithData gene)
+	{
+		return gene.getData(DataType.ACETYLPROTEIN);
+	}
+
+	public Set<ExperimentData> getEvidenceForMethylChange(GeneWithData gene)
+	{
+		return gene.getData(DataType.METHYLPROTEIN);
+	}
+
+	public Set<ExperimentData> getEvidenceForMetaboliteChange(GeneWithData gene)
+	{
+		return gene.getData(DataType.METABOLITE);
+	}
+
 
 	/**
 	 * This method iterates over total protein and phosphoprotein data that has a known effect, and leaves only the one
@@ -540,7 +615,7 @@ public class CausalitySearcher implements Cloneable
 		this.causal = causal ? 1 : -1;
 	}
 
-	public Set<PhosphoProteinData> getDataNeedsAnnotation()
+	public Set<SiteModProteinData> getDataNeedsAnnotation()
 	{
 		return dataNeedsAnnotation;
 	}
@@ -653,9 +728,9 @@ public class CausalitySearcher implements Cloneable
 		this.graphFilter = graphFilter;
 	}
 
-	public boolean hasGraphFilter()
+	public boolean hasNoGraphFilter()
 	{
-		return graphFilter != null;
+		return graphFilter == null;
 	}
 
 	public GraphFilter getGraphFilter()

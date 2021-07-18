@@ -66,6 +66,8 @@ public class GraphFilter
 				break;
 			case PHOSPHO_ONLY: relations = relations.stream().filter(r -> r.type.affectsPhosphoSite).collect(Collectors.toSet());
 				break;
+			case SITE_SPECIFIC_ONLY: relations = relations.stream().filter(r -> r.type.isSiteSpecific()).collect(Collectors.toSet());
+				break;
 			case EXPRESSION_ONLY: relations = relations.stream()
 				.filter(r -> r.type.affectsTotalProt).collect(Collectors.toSet());
 				break;
@@ -100,6 +102,7 @@ public class GraphFilter
 		{
 			case NO_FILTER:
 			case PHOSPHO_ONLY:
+			case SITE_SPECIFIC_ONLY:
 			case EXPRESSION_ONLY:
 			case WITHOUT_EXPRESSION:
 				break;
@@ -144,6 +147,7 @@ public class GraphFilter
 	{
 		NO_FILTER ("The graph is used with all inferred relations."),
 		PHOSPHO_ONLY ("Only phosphorylation relations are desired."),
+		SITE_SPECIFIC_ONLY ("Only site-specific relations are desired."),
 		EXPRESSION_ONLY ("Only expression relations are desired."),
 		WITHOUT_EXPRESSION ("Everything but expression relations are desired."),
 		PHOSPHO_PRIMARY_EXPRESSION_SECONDARY ("All phosphorylation relations " +

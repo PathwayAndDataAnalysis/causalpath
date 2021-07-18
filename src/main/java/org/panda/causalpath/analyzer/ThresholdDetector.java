@@ -56,6 +56,7 @@ public class ThresholdDetector implements OneDataChangeDetector
 			NumericData nd = (NumericData) data;
 			switch (avgMet)
 			{
+				case FIRST_VALUE: return nd.vals[0];
 				case ARITHMETIC_MEAN: return ArrayUtil.mean(nd.vals);
 				case FOLD_CHANGE_MEAN: return foldChangeGeometricMean(nd.vals);
 				case MAX: return maxOfAbs(nd.vals);
@@ -67,6 +68,7 @@ public class ThresholdDetector implements OneDataChangeDetector
 
 			switch (avgMet)
 			{
+				case FIRST_VALUE: return qd.getCategories()[0];
 				case ARITHMETIC_MEAN: return ArrayUtil.mean(qd.getCategories());
 				case FOLD_CHANGE_MEAN: throw new RuntimeException("Fold change averaging cannot be applied to categories.");
 				case MAX: return maxOfAbs(qd.getCategories());
@@ -137,6 +139,7 @@ public class ThresholdDetector implements OneDataChangeDetector
 	{
 		ARITHMETIC_MEAN,
 		FOLD_CHANGE_MEAN,
-		MAX
+		MAX,
+		FIRST_VALUE
 	}
 }

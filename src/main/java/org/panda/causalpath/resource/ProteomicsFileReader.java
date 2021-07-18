@@ -1,5 +1,6 @@
 package org.panda.causalpath.resource;
 
+import org.panda.resource.siteeffect.Feature;
 import org.panda.resource.tcga.ProteomicsFileRow;
 
 import java.io.File;
@@ -35,13 +36,13 @@ public class ProteomicsFileReader
 	 * Reads the annotation in a given proteomics file.
 	 *
 	 * @param filename name of the file
-	 * @param idname name of the ID column
-	 * @param symbolname name of the symbols column
-	 * @param psitename name of the sites column
-	 * @param effectName name of the effect column
+	 * @param idCol name of the ID column
+	 * @param symbolCol name of the symbols column
+	 * @param siteCol name of the sites column
+	 * @param effectCol name of the effect column
 	 */
-	public static List<ProteomicsFileRow> readAnnotation(String filename, String idname, String symbolname,
-		String psitename, String effectName) throws FileNotFoundException
+	public static List<ProteomicsFileRow> readAnnotation(String filename, String idCol, String symbolCol,
+		String siteCol, String modCol, String effectCol) throws FileNotFoundException
 	{
 		List<ProteomicsFileRow> datas = new ArrayList<>();
 
@@ -49,10 +50,11 @@ public class ProteomicsFileReader
 		String s = sc.nextLine();
 		List<String> cols = Arrays.asList(s.split("\t"));
 
-		int colInd = cols.indexOf(idname);
-		int symbolInd = cols.indexOf(symbolname);
-		int siteInd = cols.indexOf(psitename);
-		int effectInd = effectName == null ? -1 : cols.indexOf(effectName);
+		int colInd = cols.indexOf(idCol);
+		int symbolInd = cols.indexOf(symbolCol);
+		int siteInd = cols.indexOf(siteCol);
+		int modInd = modCol == null ? -1 : cols.indexOf(modCol);
+		int effectInd = effectCol == null ? -1 : cols.indexOf(effectCol);
 
 		while (sc.hasNextLine())
 		{
@@ -60,6 +62,7 @@ public class ProteomicsFileReader
 			String id = row[colInd];
 			String syms = row[symbolInd];
 			String sites = row.length > siteInd ? row[siteInd] : "";
+			Feature feature = modInd >= 0 && row.length > modInd ? Feature.getFeat(row[modInd]) : null;
 			String effect = effectInd >= 0 && row.length > effectInd ? row[effectInd] : null;
 
 			List<String> genes = Arrays.asList(syms.split("\\s+"));
@@ -80,7 +83,7 @@ public class ProteomicsFileReader
 				}
 			}
 
-			ProteomicsFileRow data = new ProteomicsFileRow(id, null, genes, siteMap);
+			ProteomicsFileRow data = new ProteomicsFileRow(id, null, genes, siteMap, feature);
 
 			if (effect != null)
 			{

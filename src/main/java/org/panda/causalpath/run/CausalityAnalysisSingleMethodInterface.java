@@ -54,7 +54,7 @@ public class CausalityAnalysisSingleMethodInterface
 	 * @throws IOException
 	 */
 	public static void generateCausalityGraph(String platformFile, String idColumn,
-		String symbolsColumn, String sitesColumn, String effectColumn, String valuesFile,
+		String symbolsColumn, String sitesColumn, String modificationColumn, String effectColumn, String valuesFile,
 		String valueColumn, double valueThreshold, String graphType, boolean doSiteMatch,
 		int siteMatchProximityThreshold, int siteEffectProximityThreshold, boolean geneCentric,
 		double colorSaturationValue, String outputFilePrefix, String customNetworkDirectory) throws IOException
@@ -63,7 +63,7 @@ public class CausalityAnalysisSingleMethodInterface
 
 		// Read platform file
 		List<ProteomicsFileRow> rows = ProteomicsFileReader.readAnnotation(platformFile, idColumn, symbolsColumn,
-			sitesColumn, effectColumn);
+			sitesColumn, modificationColumn, effectColumn);
 
 		// Read values
 		List<String> vals = Collections.singletonList(valueColumn);
@@ -124,7 +124,7 @@ public class CausalityAnalysisSingleMethodInterface
 	public static void main(String[] args) throws IOException
 	{
 		generateCausalityGraph("/home/babur/Documents/Temp/temp/platform.txt", "ID1", "Symbols", "Sites",
-			"Effect", "/home/babur/Documents/Temp/temp/values.txt", "change", 0.001,
+			null, "Effect", "/home/babur/Documents/Temp/temp/values.txt", "change", 0.001,
 			"conflicting", false, 0, 0, false, 10.0, "/home/babur/Documents/Temp/temp/out", null);
 	}
 }

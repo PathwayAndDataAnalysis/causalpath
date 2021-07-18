@@ -10,9 +10,12 @@ public enum DataType
 	PROTEIN(true),
 	PHOSPHOPROTEIN(true),
 	RNA(true),
-	CNA(false),
+	DNA_CNA(false),
+	DNA_METHYLATION(true),
 	MUTATION(false),
-	METHYLATION(true),
+	ACETYLPROTEIN(true),
+	METHYLPROTEIN(true),
+	METABOLITE(true),
 	ACTIVITY(false);
 
 	boolean numerical;

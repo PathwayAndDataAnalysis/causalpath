@@ -15,7 +15,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Calculates the significance of several things in the result network. These are the size of the network overall, and
@@ -55,7 +54,7 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 	public void run(int iterations)
 	{
 		// Init counter
-		DownstreamCounter dc = new DownstreamCounterForCorrelation(cs);
+		DownstreamCounterForCorrelation dc = new DownstreamCounterForCorrelation(cs);
 
 		Set<String> ignore = dc.getGenesWithNoPotential(relations);
 
@@ -149,10 +148,10 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 
 		//----- DEBUG------------------------------
 		// Plot graph size significance
-		Map<String, double[]> map = new HashMap<>();
-		map.put(ArrayUtil.mean(sizes) + " (mean of random)", sizes);
-		map.put(sizeCurrent + " (actual)", new double[]{sizeCurrent});
-		KernelDensityPlot.plot("Graph size distribution", map);
+//		Map<String, double[]> map = new HashMap<>();
+//		map.put(ArrayUtil.mean(sizes) + " (mean of random)", sizes);
+//		map.put(sizeCurrent + " (actual)", new double[]{sizeCurrent});
+//		KernelDensityPlot.plot("Graph size distribution", map);
 		//----- DEBUG------------------------------
 
 		// Convert counts to p-values

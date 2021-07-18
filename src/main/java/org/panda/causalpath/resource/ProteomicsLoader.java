@@ -5,12 +5,10 @@ import org.panda.causalpath.analyzer.OneDataChangeDetector;
 import org.panda.causalpath.data.*;
 import org.panda.causalpath.network.Relation;
 import org.panda.resource.tcga.ProteomicsFileRow;
-import org.panda.utility.ArrayUtil;
 import org.panda.utility.statistics.Histogram;
 import org.panda.utility.statistics.Summary;
 
 import java.util.*;
-import java.util.stream.Stream;
 
 /**
  * Coverts the RPPAData in resource project to appropriate objects for this project and serves them.
@@ -37,7 +35,10 @@ public class ProteomicsLoader
 		rows.stream().distinct().forEach(r ->
 		{
 			ExperimentData ed = r.isActivity() ? new ActivityData(r) :
-				r.isPhospho() ? new PhosphoProteinData(r) : new ProteinData(r);
+				r.isSiteSpecific() ? new SiteModProteinData(r) :
+				r.isRNA() ? new RNAData(r) :
+				r.isMetabolite() ? new MetaboliteData(r) :
+					new ProteinData(r);
 
 			if (stdevThresholds != null && ed instanceof NumericData)
 			{
@@ -74,7 +75,7 @@ public class ProteomicsLoader
 		rows.stream().distinct().forEach(r ->
 		{
 			ExperimentData ed = r.isActivity() ? new ActivityData(r) :
-				r.isPhospho() ? new PhosphoProteinData(r) : new ProteinData(r);
+				r.isSiteSpecific() ? new SiteModProteinData(r) : new ProteinData(r);
 
 			if (stdevThresholds != null && ed instanceof NumericData)
 			{

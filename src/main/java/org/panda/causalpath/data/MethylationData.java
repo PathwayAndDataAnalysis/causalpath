@@ -30,6 +30,6 @@ public class MethylationData extends NumericData
 	@Override
 	public DataType getType()
 	{
-		return DataType.METHYLATION;
+		return DataType.DNA_METHYLATION;
 	}
 }

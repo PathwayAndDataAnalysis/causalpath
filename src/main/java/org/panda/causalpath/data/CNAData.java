@@ -21,6 +21,6 @@ public class CNAData extends CategoricalData
 	@Override
 	public DataType getType()
 	{
-		return DataType.CNA;
+		return DataType.DNA_CNA;
 	}
 }

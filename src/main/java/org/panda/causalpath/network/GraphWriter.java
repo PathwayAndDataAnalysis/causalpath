@@ -1,7 +1,7 @@
 package org.panda.causalpath.network;
 
 import com.github.jsonldjava.utils.JsonUtils;
-import org.panda.causalpath.analyzer.NSCForNonCorr;
+import org.panda.causalpath.analyzer.NSCForComparison;
 import org.panda.causalpath.analyzer.NetworkSignificanceCalculator;
 import org.panda.causalpath.data.*;
 import org.panda.utility.ArrayUtil;
@@ -231,38 +231,42 @@ public class GraphWriter
 			}
 
 			String bor = inString(defaultBorderColor);
-			String let = "x";
+			String let = "?";
 
-			if (data instanceof PhosphoProteinData)
+			if (data instanceof SiteModProteinData)
 			{
-				PhosphoProteinData pd = (PhosphoProteinData) data;
+				SiteModProteinData pd = (SiteModProteinData) data;
 				if (pd.getEffect() > 0) bor = inString(activatingBorderColor);
 				else if (pd.getEffect() < 0) bor = inString(inhibitingBorderColor);
 
-				let = "p";
+				let = pd.getModification().toString().substring(0, 1).toLowerCase();
 			}
 			else if (data instanceof ProteinData)
 			{
 				let = "t";
 			}
+			else if (data instanceof MetaboliteData)
+			{
+				let = "c";
+			}
 			else if (data instanceof MutationData)
 			{
-				let = "m";
+				let = "x";
 				if (data.getEffect() == 1)
 					bor = inString(activatingBorderColor);
 				else bor = inString(inhibitingBorderColor);
 			}
 			else if (data instanceof CNAData)
 			{
-				let = "c";
+				let = "d";
 			}
 			else if (data instanceof RNAData)
 			{
-				let = "e";
+				let = "r";
 			}
 			else if (data instanceof ActivityData)
 			{
-				let = data.getChangeSign() > 0 ? "a" : "i";
+				let = data.getChangeSign() > 0 ? "!" : "i";
 				bor = inString(activatingBorderColor);
 			}
 
@@ -280,10 +284,10 @@ public class GraphWriter
 					boolean act = false;
 					boolean inh = false;
 
-					if (nsc instanceof NSCForNonCorr)
+					if (nsc instanceof NSCForComparison)
 					{
-						act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(gene);
-						inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(gene);
+						act = ((NSCForComparison) nsc).isActivatingTargetsSignificant(gene);
+						inh = ((NSCForComparison) nsc).isInhibitoryTargetsSignificant(gene);
 					}
 
 					if (act && !inh) FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(activatingBorderColor), writer2);
@@ -292,11 +296,20 @@ public class GraphWriter
 					//else FileUtil.writeln("node\t" + gene + "\tbordercolor\t" + inString(defaultBorderColor), writer2);
 				}
 
-				if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(gene))
+				if (useGeneBGForTotalProtein && (let.equals("t") || let.equals("c")) && !totalProtUsedUp.contains(gene))
 				{
-					FileUtil.writeln("node\t" + gene + "\tcolor\t" + colS, writer2);
-					FileUtil.writeln("node\t" + gene + "\ttooltip\t" + siteID + ", " + val, writer2);
-					totalProtUsedUp.add(gene);
+					if (let.equals("c"))
+					{
+						FileUtil.writeln("node\t" + siteID + "\tcolor\t" + colS, writer2);
+						FileUtil.writeln("node\t" + siteID + "\ttooltip\t" + gene + ", " + val, writer2);
+						totalProtUsedUp.add(gene);
+					}
+					else
+					{
+						FileUtil.writeln("node\t" + gene + "\tcolor\t" + colS, writer2);
+						FileUtil.writeln("node\t" + gene + "\ttooltip\t" + siteID + ", " + val, writer2);
+						totalProtUsedUp.add(gene);
+					}
 				}
 				else
 				{
@@ -397,7 +410,9 @@ public class GraphWriter
 
 		relations.forEach(rel ->
 		{
-			String key = rel.source + "\t" + rel.type.getName() + "\t" + rel.target;
+			String src = rel.source.startsWith("CHEBI:") ? rel.sourceData.getData().iterator().next().getId() : rel.source;
+			String tgt = rel.target.startsWith("CHEBI:") ? rel.targetData.getData().iterator().next().getId() : rel.target;
+			String key = src + "\t" + rel.type.getName() + "\t" + tgt;
 			if (relMem.contains(key)) return;
 			else relMem.add(key);
 
@@ -405,8 +420,8 @@ public class GraphWriter
 			edges.add(edge);
 			Map<String, Object> dMap = new HashMap<>();
 			edge.put("data", dMap);
-			dMap.put("source", rel.source);
-			dMap.put("target", rel.target);
+			dMap.put("source", src);
+			dMap.put("target", tgt);
 			dMap.put("edgeType", rel.type.getName());
 			dMap.put("tooltipText", CollectionUtil.merge(rel.getTargetWithSites(0), ", "));
 
@@ -438,38 +453,42 @@ public class GraphWriter
 			}
 
 			String bor = inJSONString(defaultBorderColor);
-			String let = "x";
+			String let = "?";
 
-			if (data instanceof PhosphoProteinData)
+			if (data instanceof SiteModProteinData)
 			{
-				PhosphoProteinData pd = (PhosphoProteinData) data;
+				SiteModProteinData pd = (SiteModProteinData) data;
 				if (pd.getEffect() > 0) bor = inJSONString(activatingBorderColor);
 				else if (pd.getEffect() < 0) bor = inJSONString(inhibitingBorderColor);
 
-				let = "p";
+				let = pd.getModification().toString().substring(0, 1).toLowerCase();
 			}
 			else if (data instanceof ProteinData)
 			{
 				let = "t";
 			}
+			else if (data instanceof MetaboliteData)
+			{
+				let = "c";
+			}
 			else if (data instanceof MutationData)
 			{
-				let = "m";
+				let = "x";
 				if (data.getEffect() == 1)
 					bor = inJSONString(activatingBorderColor);
 				else bor = inJSONString(inhibitingBorderColor);
 			}
 			else if (data instanceof CNAData)
 			{
-				let = "c";
+				let = "d";
 			}
 			else if (data instanceof RNAData)
 			{
-				let = "e";
+				let = "r";
 			}
 			else if (data instanceof ActivityData)
 			{
-				let = data.getChangeSign() > 0 ? "a" : "i";
+				let = data.getChangeSign() > 0 ? "!" : "i";
 				bor = inJSONString(activatingBorderColor);
 			}
 
@@ -478,9 +497,10 @@ public class GraphWriter
 
 			for (String sym : data.getGeneSymbols())
 			{
-				initJsonNode(geneMap, nodes, sym);
+				String nodeText = let.equals("c") ? siteID : sym;
+				initJsonNode(geneMap, nodes, nodeText);
 
-				Map node = geneMap.get(sym);
+				Map node = geneMap.get(nodeText);
 
 				if (nsc != null)
 				{
@@ -493,10 +513,10 @@ public class GraphWriter
 					boolean act = false;
 					boolean inh = false;
 
-					if (nsc instanceof NSCForNonCorr)
+					if (nsc instanceof NSCForComparison)
 					{
-						act = ((NSCForNonCorr) nsc).isActivatingTargetsSignificant(sym);
-						inh = ((NSCForNonCorr) nsc).isInhibitoryTargetsSignificant(sym);
+						act = ((NSCForComparison) nsc).isActivatingTargetsSignificant(sym);
+						inh = ((NSCForComparison) nsc).isInhibitoryTargetsSignificant(sym);
 					}
 
 					if (act || inh && !node.containsKey("css")) node.put("css", new HashMap<>());
@@ -506,12 +526,13 @@ public class GraphWriter
 					else if (act /** && inh **/) ((Map) node.get("css")).put("borderColor", inJSONString(doubleSignificanceBorderColor));
 				}
 
-				if (useGeneBGForTotalProtein && let.equals("t") && !totalProtUsedUp.contains(sym))
+				if (useGeneBGForTotalProtein && (let.equals("t") || let.equals("c")) && !totalProtUsedUp.contains(nodeText))
 				{
 					if (!node.containsKey("css")) node.put("css", new HashMap<>());
 					((Map) node.get("css")).put("backgroundColor", colS);
-					((Map) node.get("data")).put("tooltipText", val.isEmpty() ? siteID : siteID + ", " + val);
-					totalProtUsedUp.add(sym);
+					String tooltip = (let.equals("c") ? sym : siteID) + (val.isEmpty() ? "" : ", " + val);
+					((Map) node.get("data")).put("tooltipText", tooltip);
+					totalProtUsedUp.add(nodeText);
 				}
 				else
 				{

@@ -13,6 +13,7 @@ import org.panda.resource.ResourceDirectory;
 import org.panda.resource.siteeffect.PhosphoSitePlus;
 import org.panda.resource.siteeffect.Signor;
 import org.panda.resource.siteeffect.SiteEffectCollective;
+import org.panda.resource.siteeffect.Feature;
 import org.panda.resource.tcga.ProteomicsFileRow;
 import org.panda.utility.ArrayUtil;
 import org.panda.utility.BooleanMatrixRandomizer;
@@ -84,6 +85,12 @@ public class CausalPath
 	private String sitesColumn;
 
 	/**
+	 * The name of the column that contains the type of the measured feature such as global protein, RNA, or a
+	 * site-specific modification.
+	 */
+	private String featureColumn;
+
+	/**
 	 * The name of the column that contains modified site effects.
 	 */
 	private String effectColumn;
@@ -113,6 +120,16 @@ public class CausalPath
 	 * Name of the RNA expression file to load.
 	 */
 	private String rnaExpressionFile;
+
+	/**
+	 * Name of the acetylation enriched proteomics file.
+	 */
+	private String acetylProteomicFile;
+
+	/**
+	 * Name of the methylation enriched proteomics file.
+	 */
+	private String methylProteomicFile;
 
 	/**
 	 * A file for using custom causal priors in the analysis. This is useful for reproducibility.
@@ -353,7 +370,7 @@ public class CausalPath
 		// Read platform file
 		List<ProteomicsFileRow> rows = ProteomicsFileReader.readAnnotation(
 			adjustFileLocation(proteomicsPlatformFile),
-			IDColumn, symbolsColumn, sitesColumn, effectColumn);
+			IDColumn, symbolsColumn, sitesColumn, featureColumn, effectColumn);
 
 		// Read values
 		ProteomicsFileReader.addValues(rows, adjustFileLocation(proteomicsValuesFile),
@@ -381,7 +398,7 @@ public class CausalPath
 				// Read platform file
 				rows = ProteomicsFileReader.readAnnotation(
 					adjustFileLocation(noPlatform ? file : proteomicsPlatformFile),
-					IDColumn, symbolsColumn, sitesColumn, effectColumn);
+					IDColumn, symbolsColumn, sitesColumn, featureColumn, effectColumn);
 
 				// Read values
 				ProteomicsFileReader.addValues(rows, adjustFileLocation(file),
@@ -457,17 +474,41 @@ public class CausalPath
 			if (hasThresholdFor(DataType.PHOSPHOPROTEIN))
 			{
 				loader.associateChangeDetector(getOneDataChangeDetector(DataType.PHOSPHOPROTEIN, ctrl, test, dataIDs),
-					data -> data instanceof PhosphoProteinData);
+					data -> data instanceof SiteModProteinData && ((SiteModProteinData) data).getModification().equals(Feature.PHOSPHORYLATION));
+			}
+			if (hasThresholdFor(DataType.ACETYLPROTEIN))
+			{
+				loader.associateChangeDetector(getOneDataChangeDetector(DataType.ACETYLPROTEIN, ctrl, test, dataIDs),
+					data -> data instanceof SiteModProteinData && ((SiteModProteinData) data).getModification().equals(Feature.ACETYLATION));
+			}
+			if (hasThresholdFor(DataType.METHYLPROTEIN))
+			{
+				loader.associateChangeDetector(getOneDataChangeDetector(DataType.METHYLPROTEIN, ctrl, test, dataIDs),
+					data -> data instanceof SiteModProteinData && ((SiteModProteinData) data).getModification().equals(Feature.METHYLATION));
 			}
 			if (hasThresholdFor(DataType.PROTEIN))
 			{
 				loader.associateChangeDetector(getOneDataChangeDetector(DataType.PROTEIN, ctrl, test, dataIDs),
-					data -> data instanceof ProteinData && !(data instanceof PhosphoProteinData));
+					data -> data instanceof ProteinData && !(data instanceof SiteModProteinData));
+			}
+			if (hasThresholdFor(DataType.RNA))
+			{
+				loader.associateChangeDetector(getOneDataChangeDetector(DataType.RNA, ctrl, test, dataIDs),
+					data -> data instanceof RNAData);
+			}
+			if (hasThresholdFor(DataType.METABOLITE))
+			{
+				loader.associateChangeDetector(getOneDataChangeDetector(DataType.METABOLITE, ctrl, test, dataIDs),
+					data -> data instanceof MetaboliteData);
 			}
 
 			// Revisit this line after adding activity file support - todo
-			loader.associateChangeDetector(new ThresholdDetector(0.1, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN), data -> data instanceof ActivityData);
+			loader.associateChangeDetector(new ThresholdDetector(0.1, ThresholdDetector.AveragingMethod.FIRST_VALUE), data -> data instanceof ActivityData);
 		}
+
+		rows = null;
+		loader = null;
+		System.gc();
 
 		// Load custom RNA data if available
 		loadRNA(ctrl, test, vals, relations);
@@ -515,7 +556,7 @@ public class CausalPath
 
 		if (nsc != null && !useCorrelation && useNetworkSignificanceForCausalReasoning)
 		{
-			if (addNetworkSignificanceAsData(relations, (NSCForNonCorr) nsc))
+			if (addNetworkSignificanceAsData(relations, (NSCForComparison) nsc))
 			{
 				// Run the inference again with new activity data
 				causal = cs.run(relations);
@@ -631,7 +672,7 @@ public class CausalPath
 	 * @param nsc the network significance calculator for non-correlation cases
 	 * @return true if any data is added
 	 */
-	public boolean addNetworkSignificanceAsData(Set<Relation> relations, NSCForNonCorr nsc)
+	public boolean addNetworkSignificanceAsData(Set<Relation> relations, NSCForComparison nsc)
 	{
 		Map<String, Integer> geneMap = nsc.getSignificantGenes();
 		Set<String> genes = geneMap.keySet();
@@ -641,11 +682,16 @@ public class CausalPath
 				.collect(Collectors.toMap(GeneWithData::getId, g -> g));
 
 			OneDataChangeDetector chDet = new ThresholdDetector(
-				0.01, ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN);
+				0.01, ThresholdDetector.AveragingMethod.FIRST_VALUE);
 
 			for (String id : genes)
 			{
 				GeneWithData gene = idToGene.get(id);
+				if (gene == null)
+				{
+					System.err.println("There is a missing significant gene: " + id);
+					continue;
+				}
 
 				// If there is already an activity data associated with this gene, skip it
 //				if (!gene.getData(DataType.ACTIVITY).isEmpty()) continue;
@@ -683,7 +729,7 @@ public class CausalPath
 			}
 			else
 			{
-				nsc = new NSCForNonCorr(relations, cs);
+				nsc = new NSCForComparison(relations, cs);
 			}
 
 			String outFile = adjustFileLocation(SIGNIFICANCE_FILENAME);
@@ -787,7 +833,7 @@ public class CausalPath
 
 			tcga.decorateRelations(relations);
 
-			tcga.associateChangeDetector(getOneDataChangeDetector(DataType.CNA, ctrl, test, null), data -> data instanceof CNAData);
+			tcga.associateChangeDetector(getOneDataChangeDetector(DataType.DNA_CNA, ctrl, test, null), data -> data instanceof CNAData);
 			tcga.associateChangeDetector(getOneDataChangeDetector(DataType.RNA, ctrl, test, null), data -> data instanceof RNAData);
 			tcga.associateChangeDetector(getOneDataChangeDetector(DataType.MUTATION, ctrl, test, null), data -> data instanceof MutationData);
 		}
@@ -812,7 +858,7 @@ public class CausalPath
 			{
 				int a = activityMap.get(gene);
 				ProteomicsFileRow activityRow = new ProteomicsFileRow(gene + "-" + (a < 0 ? "inactive" : "active"),
-					null, Collections.singletonList(gene), null);
+					null, Collections.singletonList(gene), null, null);
 				activityRow.makeActivityNode(a > 0);
 				rows.add(activityRow);
 			}
@@ -832,7 +878,7 @@ public class CausalPath
 			{
 				boolean a = t[1].startsWith("a");
 				ProteomicsFileRow activityRow = new ProteomicsFileRow(t[0] + "-" + (a ? "active-tf" : "inactive-tf"),
-					null, Collections.singletonList(t[0]), null);
+					null, Collections.singletonList(t[0]), null, null);
 				activityRow.makeActivityNode(a);
 				rows.add(activityRow);
 			});
@@ -845,12 +891,14 @@ public class CausalPath
 
 		if (transformation == ValueTransformation.ARITHMETIC_MEAN ||
 			transformation == ValueTransformation.GEOMETRIC_MEAN ||
+			transformation == ValueTransformation.AS_IS_SINGLE_VALUE ||
 			transformation == ValueTransformation.MAX)
 		{
 			detector = new ThresholdDetector(thresholdForDataSignificance.get(type));
 			((ThresholdDetector) detector).setAveragingMethod(transformation == ValueTransformation.ARITHMETIC_MEAN ?
 				ThresholdDetector.AveragingMethod.ARITHMETIC_MEAN : transformation == ValueTransformation.GEOMETRIC_MEAN ?
-				ThresholdDetector.AveragingMethod.FOLD_CHANGE_MEAN : ThresholdDetector.AveragingMethod.MAX);
+				ThresholdDetector.AveragingMethod.FOLD_CHANGE_MEAN :transformation == ValueTransformation.AS_IS_SINGLE_VALUE ?
+				ThresholdDetector.AveragingMethod.FIRST_VALUE : ThresholdDetector.AveragingMethod.MAX);
 		}
 		else if (transformation == ValueTransformation.DIFFERENCE_OF_MEANS)
 		{
@@ -909,10 +957,10 @@ public class CausalPath
 		phosphoRM = bmr.readRandomMatrices(randomizedMatrixDirectory + "/" + BooleanMatrixRandomizer.PHOSPHO_DIR, dataIDs);
 	}
 
-	private void writeSitesToCurate(Set<PhosphoProteinData> datas) throws IOException
+	private void writeSitesToCurate(Set<SiteModProteinData> datas) throws IOException
 	{
 		Set<String> sites = new HashSet<>();
-		for (PhosphoProteinData data : datas)
+		for (SiteModProteinData data : datas)
 		{
 			sites.addAll(data.getGenesWithSites());
 		}
@@ -1022,6 +1070,10 @@ public class CausalPath
 	 */
 	enum ValueTransformation
 	{
+		AS_IS_SINGLE_VALUE("as-is-single-value", "This option should be selected when no transformation is desired, " +
+			"and there is a single value for each data row. Thresholding should be done using " +
+			"threshold-for-data-significance.", false),
+
 		ARITHMETIC_MEAN("arithmetic-mean", "The arithmetic mean value of the given values is used for significance " +
 			"detection of a single change. There should only be one group of values (marked with value-column), the " +
 			"values have to be distributed around zero, and a threshold value should be provided for significance " +
@@ -1138,7 +1190,7 @@ public class CausalPath
 	{
 		PROTEOMICS_VALUES_FILE((value, cp) -> cp.proteomicsValuesFile = value,
 			"Proteomics values file",
-			"Name of the proteomics values file. It should have at least one ID column and one or more columns for " +
+			"Path to the proteomics values file. It should have at least one ID column and one or more columns for " +
 				"experiment values. Platform file and values file can be the same file.",
 			new EntryType(File.class), null, true, false, null),
 		PROTEOMICS_REPEAT_VALUES_FILE((value, cp) ->
@@ -1147,31 +1199,35 @@ public class CausalPath
 			cp.proteomicsRepeatValuesFiles.add(value);
 		},
 			"Proteomics repeat values file",
-			"Name of the proteomics values file for the repeated experiment, if exists. This file has to have the " +
+			"Path to the proteomics values file for the repeated experiment, if exists. This file has to have the " +
 				"exact same columns with the original proteomic values file, in the same order. Row IDs have to match" +
 				" with the corresponding row in the original data.",
 			new EntryType(File.class), null, false, true, null),
 		PROTEOMICS_PLATFORM_FILE((value, cp) -> cp.proteomicsPlatformFile = value,
 			"Proteomics platform file",
-			"Name of the proteomics platform file. Each row should belong to either a gene's total protein " +
+			"Path to the proteomics platform file. Each row should belong to either a gene's total protein " +
 				"measurement, or a site specific measurement. This file should contain ID, gene symbols, modification" +
 				" sites, and known site effects. Platform file and values file can be the same file.",
 			new EntryType(File.class), null, false, false, null),
 		ID_COLUMN((value, cp) -> cp.IDColumn = value,
 			"ID column in data file",
-			"The name of the ID column in platform and values files.",
+			"The name of the ID column in platform or values files.",
 			new EntryType(String.class), new String[][]{{"ID"}}, true, false, null),
 		SYMBOLS_COLUMN((value, cp) -> cp.symbolsColumn = value,
 			"Symbols column in data file",
-			"The name of the symbols column in platform file.",
+			"The name of the symbols column in platform or values file.",
 			new EntryType(String.class), new String[][]{{"Symbols"}}, true, false, null),
 		SITES_COLUMN((value, cp) -> cp.sitesColumn = value,
 			"Sites column in data file",
 			"The name of the sites column.",
 			new EntryType(String.class), new String[][]{{"Sites"}}, true, false, null),
+		FEATURE_COLUMN((value, cp) -> cp.featureColumn = value,
+			"Feature column in data file",
+			"The name of the feature column.",
+			new EntryType(String.class), new String[][]{{"Feature"}}, false, false, null),
 		EFFECT_COLUMN((value, cp) -> cp.effectColumn = value,
 			"Site effect column in data file",
-			"The name of the effect column.",
+			"The name of the effect column in platform or values file.",
 			new EntryType(String.class), new String[][]{{"Effect"}}, false, false, null),
 		VALUE_TRANSFORMATION((value, cp) ->
 		{
@@ -1193,10 +1249,11 @@ public class CausalPath
 			cp.valueColumn.add(value);
 		},
 			"Value column in the data file",
-			"Name of a value column. This parameter should be used when there is only one group of experiments to " +
+			"Name of a value column in the values file. This parameter should be used when there is only one group of experiments to " +
 				"consider in the analysis.",
 			new EntryType(String.class), null, true, true,
 			new Cond(Logical.OR,
+				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.AS_IS_SINGLE_VALUE.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.ARITHMETIC_MEAN.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.GEOMETRIC_MEAN.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.MAX.name),
@@ -1238,6 +1295,16 @@ public class CausalPath
 			"RNA expression file",
 			"Name of the RNA expression file. Simple tab-delimited text file where the first row has sample names, " +
 				"every other row corresponds to a gene, and first column is the gene symbol.",
+			new EntryType(File.class), null, false, false, null),
+		ACETYL_PROTEOMIC_FILE((value, cp) -> cp.acetylProteomicFile = value,
+			"Acetylprotein readouts file",
+			"Name of the acetylpeptide-enriched proteomic file. The format of this file should be exactly the same " +
+				"with the phosphoproteomic file.",
+			new EntryType(File.class), null, false, false, null),
+		METHYL_PROTEOMIC_FILE((value, cp) -> cp.methylProteomicFile = value,
+			"Methylprotein readouts file",
+			"Name of the methylpeptide-enriched proteomic file. The format of this file should be exactly the same " +
+				"with the phosphoproteomic file.",
 			new EntryType(File.class), null, false, false, null),
 		THRESHOLD_FOR_DATA_SIGNIFICANCE((value, cp) ->
 		{
@@ -1421,7 +1488,7 @@ public class CausalPath
 			false, true, null),
 		RELATION_FILTER_TYPE((value, cp) ->
 		{
-			if (!cp.cs.hasGraphFilter())
+			if (cp.cs.hasNoGraphFilter())
 			{
 				cp.cs.setGraphFilter(new GraphFilter(value));
 			}
@@ -1438,7 +1505,7 @@ public class CausalPath
 			true, false, null),
 		GENE_FOCUS((value, cp) ->
 		{
-			if (!cp.cs.hasGraphFilter())
+			if (cp.cs.hasNoGraphFilter())
 			{
 				cp.cs.setGraphFilter(new GraphFilter(new HashSet<>(Arrays.asList(value.split(";")))));
 			}
@@ -1515,7 +1582,7 @@ public class CausalPath
 			new EntryType(String.class, ActivityLabel.class), null, false, true,
 			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		TF_ACTIVITY_FILE((value, cp) -> cp.tfActivityFile = value,
-			"Transcription factory activity inference file",
+			"Transcription factor activity inference file",
 			"CausalPath lets users to input results from an inference for transcriptional factor activities, such as" +
 				" PRECEPTS, MARINa or VIPER. For this, the results should be prepared in a file, first column " +
 				"containing TF symbol and the second column whether 'activated' or 'inhibited'. The name of such file" +
@@ -1634,6 +1701,11 @@ public class CausalPath
 			return null;
 		}
 
+		public String getTitle()
+		{
+			return title;
+		}
+
 		public String getInfo()
 		{
 			return info;
@@ -1680,7 +1752,7 @@ public class CausalPath
 			StringBuilder sb = new StringBuilder();
 			for (Parameter param : values())
 			{
-				sb.append("`").append(param.getText()).append("`: ").append(param.getInfo().replaceAll("\n", "\n\n")).append("\n\n");
+				sb.append("`").append(param.getText()).append("`: ").append(param.getTitle()).append(". ").append(param.getInfo().replaceAll("\n", "\n\n")).append("\n\n");
 			}
 			return sb.toString();
 		}

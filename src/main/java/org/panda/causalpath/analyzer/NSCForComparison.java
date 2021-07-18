@@ -21,7 +21,7 @@ import java.util.stream.Stream;
  *
  * @author Ozgun Babur
  */
-public class NSCForNonCorr extends NetworkSignificanceCalculator
+public class NSCForComparison extends NetworkSignificanceCalculator
 {
 	/**
 	 * The result maps that indicate p-values for a node downstream composition.
@@ -36,7 +36,7 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	 * @param relations set of relations to process
 	 * @param cs the configured causality searcher
 	 */
-	public NSCForNonCorr(Set<Relation> relations, CausalitySearcher cs)
+	public NSCForComparison(Set<Relation> relations, CausalitySearcher cs)
 	{
 		super(relations, cs);
 	}
@@ -56,15 +56,21 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 	 */
 	public void run(int iterations)
 	{
+		// Replace relations with a shuffle-safe copy
+		DataLabelShuffler dls = new DataLabelShuffler(relations);
+		Set<Relation> rels = dls.getRelations();
+
+		rels = rels.stream().filter(cs::hasConsiderableDownstreamData).collect(Collectors.toSet());
+
 		// Init counter
-		DownstreamCounter dc = new DownstreamCounter(cs);
+		DownstreamCounterForComparison dc = new DownstreamCounterForComparison(cs, rels);
 
 		// Get the genes with no sufficient data or their downstream have no such data even to be considered
-		Set<String> ignore = dc.getGenesWithNoPotential(relations);
+		Set<String> ignore = dc.getGenesWithNoPotential(rels);
 
 		// Get current statistics
-		Map<String, Integer>[] current = dc.run(relations);
-		relations.stream().map(r -> r.source).filter(gene -> !ignore.contains(gene) && !current[0].containsKey(gene))
+		Map<String, Integer>[] current = dc.run();
+		rels.stream().map(r -> r.source).distinct().filter(gene -> !ignore.contains(gene) && !current[0].containsKey(gene))
 			.forEach(gene ->
 			{
 				current[0].put(gene, 0);
@@ -73,7 +79,7 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 			});
 
 		// Get max possible counts for each source gene
-		Map<String, Integer> maxPotential = dc.getGenesPotentialDownstreamMax(relations);
+		Map<String, Integer> maxPotential = dc.getGenesPotentialDownstreamMax(rels);
 
 		if (minimumPotentialTargetsToConsider > 1)
 		{
@@ -89,7 +95,7 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 		}
 
 		// Get a run with non-randomized data to find current size
-		Set<Relation> result = cs.run(relations);
+		Set<Relation> result = cs.run(rels);
 		long sizeCurrent = result.size();
 
 		long sizeCnt = 0;
@@ -101,17 +107,13 @@ public class NSCForNonCorr extends NetworkSignificanceCalculator
 			cnt[i] = new HashMap<>();
 		}
 
-		// Replace relations with a shuffle-safe copy
-		DataLabelShuffler dls = new DataLabelShuffler(relations);
-		Set<Relation> rels = dls.getRelations();
-
 		Progress prog = new Progress(iterations, "Calculating significances");
 
 		for (int i = 0; i < iterations; i++)
 		{
 			// Shuffle data labels and count downstream of each gene
 			dls.shuffle();
-			Map<String, Integer>[] run = dc.run(rels);
+			Map<String, Integer>[] run = dc.run();
 
 			// Count the cases shuffling provided as good results
 			for (int j = 0; j < 3; j++)
