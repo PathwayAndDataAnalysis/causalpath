@@ -72,6 +72,10 @@ public class ProteomicsFileReader
 				String[] perGene = sites.split("\\s+");
 				for (int i = 0; i < perGene.length; i++)
 				{
+					if (genes.size() <= i)
+					{
+						System.out.println("id: " + id + " genes: " + genes);
+					}
 					siteMap.put(genes.get(i), Arrays.asList(perGene[i].split("\\|")));
 				}
 				if (siteMap.size() < genes.size())

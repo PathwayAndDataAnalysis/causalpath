@@ -162,6 +162,16 @@ public class GeneWithData
 	}
 
 	/**
+	 * Tells if this gene is associated with a changed data of any kind.
+	 * @return true if there is any
+	 */
+	public boolean hasChangedData()
+	{
+		return !getChangedData().keySet().isEmpty() ||
+			!getChangedData().keySet().isEmpty();
+	}
+
+	/**
 	 * Tells if this gene is associated with any prooteomics or phosphoproteomics data.
 	 * @return true if there is any
 	 */

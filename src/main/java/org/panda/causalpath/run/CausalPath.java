@@ -137,6 +137,11 @@ public class CausalPath
 	private String customCausalPriorsFile;
 
 	/**
+	 * These will be added on top of what has already been loaded.
+	 */
+	private Set<String> additionalCustomPriorFiles;
+
+	/**
 	 * A threshold to determine significant changes whenever it applies. This can be a value threshold, or a p-value
 	 * threshold depending on the value transformation type.
 	 */
@@ -418,6 +423,15 @@ public class CausalPath
 			networkSelection == null ? NetworkLoader.load() :
 			NetworkLoader.load(NetworkLoader.ResourceType.getSelectedResources(networkSelection));
 
+		// Add additional custom priors
+		if (additionalCustomPriorFiles != null)
+		{
+			for (String priorFile : additionalCustomPriorFiles)
+			{
+				relations = NetworkLoader.load(adjustFileLocation(priorFile), relations);
+			}
+		}
+
 		if (cs.getGraphFilter() != null) relations = cs.getGraphFilter().preAnalysisFilter(relations);
 
 		System.out.println("Number of relations that go into analysis = " + relations.size());
@@ -582,8 +596,8 @@ public class CausalPath
 		{
 			if (showAllGenesWithProteomicData)
 			{
-				Set<GeneWithData> set = relations.stream().map(r -> r.sourceData).filter(GeneWithData::hasChangedProteomicData).collect(Collectors.toSet());
-				relations.stream().map(r -> r.targetData).filter(GeneWithData::hasChangedProteomicData).forEach(set::add);
+				Set<GeneWithData> set = relations.stream().map(r -> r.sourceData).filter(GeneWithData::hasChangedData).collect(Collectors.toSet());
+				relations.stream().map(r -> r.targetData).filter(GeneWithData::hasChangedData).forEach(set::add);
 				writer.setOtherGenesToShow(set);
 			}
 			else if (hideDataNotPartOfCausalRelations)
@@ -1645,6 +1659,17 @@ public class CausalPath
 			"Custom causal priors file",
 			"For reproducibility: Provide a custom file for causal priors.",
 			new EntryType(File.class), null, false, false, new Cond(Logical.NOT)),
+		ADDITIONAL_CUSTOM_PRIORS((value, cp) ->
+		{
+			if (cp.additionalCustomPriorFiles == null)
+			{
+				cp.additionalCustomPriorFiles = new HashSet<>();
+			}
+			cp.additionalCustomPriorFiles.add(value);
+		},
+			"Additional custom causal priors file(s)",
+			"This is for inserting custom hypotheses in the form of relations.",
+			new EntryType(File.class), null, false, true, new Cond(Logical.NOT)),
 		CUSTOM_SITE_EFFECTS_FILE((value, cp) -> cp.loadSiteEffectServers(value),
 			"Custom site effects file",
 			"For reproducibility: Provide a custom file for site effects.",

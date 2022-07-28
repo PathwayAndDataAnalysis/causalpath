@@ -121,10 +121,16 @@ public class NetworkLoader
 		cleanUpConflicts(allGraphs);
 
 		// Generate relations based on the network
+		relations = addGraphsToRelations(allGraphs, relations);
 
-		for (SignedType signedType : allGraphs.keySet())
+		return relations;
+	}
+
+	public static Set<Relation> addGraphsToRelations(Map<SignedType, DirectedGraph> graphs, Set<Relation> relations)
+	{
+		for (SignedType signedType : graphs.keySet())
 		{
-			DirectedGraph graph = allGraphs.get(signedType);
+			DirectedGraph graph = graphs.get(signedType);
 			if (graph == null)
 			{
 //				System.out.println("Null graph for type: " + signedType);
@@ -189,7 +195,7 @@ public class NetworkLoader
 
 		// initiate source and target data
 
-		initSourceTargetData(relations);
+		initMissingSourceTargetData(relations);
 
 		return relations;
 	}
@@ -211,26 +217,43 @@ public class NetworkLoader
 
 	public static Set<Relation> load(String customFile) throws IOException
 	{
-		Set<Relation> relations = Files.lines(Paths.get(customFile)).filter(l -> !l.isEmpty() && !l.startsWith("#")).map(Relation::new)
-			.collect(Collectors.toSet());
+		return load(customFile, null);
+	}
 
-		initSourceTargetData(relations);
+	public static Set<Relation> load(String customFile, Set<Relation> relations) throws IOException
+	{
+		if (relations == null) relations = new HashSet<>();
+
+		Files.lines(Paths.get(customFile)).filter(l -> !l.isEmpty() && !l.startsWith("#")).map(Relation::new)
+			.forEach(relations::add);
+
+		initMissingSourceTargetData(relations);
 
 		return relations;
 	}
 
-	private static void initSourceTargetData(Set<Relation> relations)
+	private static void initMissingSourceTargetData(Set<Relation> relations)
 	{
-		Set<String> genes = relations.stream().map(r -> r.source).collect(Collectors.toSet());
-		genes.addAll(relations.stream().map(r -> r.target).collect(Collectors.toSet()));
-
 		Map<String, GeneWithData> map = new HashMap<>();
-		genes.forEach(g -> map.put(g, new GeneWithData(g)));
 
 		for (Relation relation : relations)
 		{
-			relation.sourceData = map.get(relation.source);
-			relation.targetData = map.get(relation.target);
+			if (relation.sourceData != null)
+			{
+				if (!map.containsKey(relation.source)) map.put(relation.source, relation.sourceData);
+				if (!map.containsKey(relation.target)) map.put(relation.target, relation.targetData);
+			}
+		}
+
+		for (Relation relation : relations)
+		{
+			if (relation.sourceData == null)
+			{
+				relation.sourceData = map.getOrDefault(relation.source, new GeneWithData(relation.source));
+				if (!map.containsKey(relation.source)) map.put(relation.source, relation.sourceData);
+				relation.targetData = map.getOrDefault(relation.target, new GeneWithData(relation.target));
+				if (!map.containsKey(relation.target)) map.put(relation.target, relation.targetData);
+			}
 		}
 	}
 
@@ -260,6 +283,8 @@ public class NetworkLoader
 
 	private static void cleanUpConflicts(DirectedGraph graph1, DirectedGraph graph2)
 	{
+		if (graph1 == null || graph2 == null) return;
+
 		Set<String[]> rem1 = new HashSet<>();
 		Set<String[]> rem2 = new HashSet<>();
 
@@ -285,14 +310,22 @@ public class NetworkLoader
 
 	private static void cleanUpConflicts(SiteSpecificGraph graph1, SiteSpecificGraph graph2)
 	{
+		if (graph1 == null || graph2 == null) return;
+
 		for (String source : graph1.getOneSideSymbols(true))
 		{
 			for (String target : graph1.getDownstream(source))
 			{
 				if (graph2.hasRelation(source, target))
 				{
+					// For debugging the relations
+//					if (source.equals("IL6ST") && target.equals("STAT3"))
+//					{
+//						System.out.println();
+//					}
+
 					Set<String> s1 = graph1.getSites(source, target);
-					Set<String> s2 = graph1.getSites(source, target);
+					Set<String> s2 = graph2.getSites(source, target);
 
 					Set<String> common = CollectionUtil.getIntersection(s1, s2);
 
@@ -398,7 +431,7 @@ public class NetworkLoader
 	{
 		Set<Relation> rels = NetworkLoader.load();
 
-		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/Users/ozgun/Documents/Temp/causal-priors.txt"));
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/ozgunbabur/Documents/causal-priors.txt"));
 
 		for (Relation rel : rels)
 		{
@@ -420,7 +453,7 @@ public class NetworkLoader
 				map.get(rel.target).addAll(rel.sites);
 			}
 		}
-		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/ozgun/Documents/Temp/gene-to-sites.txt"));
+		BufferedWriter writer = Files.newBufferedWriter(Paths.get("/home/ozgunbabur/Documents/Temp/gene-to-sites.txt"));
 
 		for (String gene : map.keySet())
 		{

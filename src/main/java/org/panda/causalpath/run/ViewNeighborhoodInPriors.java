@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 /**
  * This class takes in a SIF file, a format file, and several gene names, and generates a neighborhood graph for the
- * given gene names in the given SIF file, and overlays data features in the format file. The view can be upload to
+ * given gene names in the given SIF file, and overlays data features in the format file. The view can be uploaded to
  * webserver. The purpose of this visualization is to understand what priors exist in the neighborhood of certain genes
  * and what data they have on. The view does not include any site matching or causality checks.
  */
