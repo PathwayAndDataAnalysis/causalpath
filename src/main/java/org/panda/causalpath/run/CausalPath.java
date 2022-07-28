@@ -1237,7 +1237,9 @@ public class CausalPath
 			new EntryType(String.class), new String[][]{{"Sites"}}, true, false, null),
 		FEATURE_COLUMN((value, cp) -> cp.featureColumn = value,
 			"Feature column in data file",
-			"The name of the feature column.",
+			"This optional column in the data file allows integration of multiple data types into a single input" +
+					" file. Make sure that each row has a unique ID, then use P for phosphopeptide, G for global " +
+					"protein, R for RNA, A for acetylpeptide, and M for methylpeptide.",
 			new EntryType(String.class), new String[][]{{"Feature"}}, false, false, null),
 		EFFECT_COLUMN((value, cp) -> cp.effectColumn = value,
 			"Site effect column in data file",
