@@ -520,6 +520,31 @@ public class CausalPath
 			loader.associateChangeDetector(new ThresholdDetector(0.1, ThresholdDetector.AveragingMethod.FIRST_VALUE), data -> data instanceof ActivityData);
 		}
 
+
+		// Test
+		KinaseAnalyzer kN = new KinaseAnalyzer(loader);
+
+		HashMap<String, List<Double>> someList = kN.getMap();
+		System.out.println("Change values");
+		System.out.println(kN.changeValues);
+		System.out.println("Starting printing");
+		for(String kinase: someList.keySet()){
+			for(Double d: someList.get(kinase)){
+				System.out.print(d + " ");
+			}
+			System.out.println("");
+		}
+
+
+
+
+
+
+
+
+
+		// End of Test
+
 		rows = null;
 		loader = null;
 		System.gc();
