@@ -6,13 +6,30 @@ import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
 import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
 import org.apache.commons.math3.stat.ranking.NaturalRanking;
 import org.apache.commons.math3.stat.ranking.RankingAlgorithm;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYItemRenderer;
+import org.jfree.data.xy.XYDataset;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
 import org.panda.causalpath.resource.ProteomicsLoader;
 import org.panda.resource.KinaseLibrary;
+
+import org.jfree.chart.ChartUtils;
 
 import org.panda.utility.statistics.*;
 
 
+import javax.swing.*;
+import java.awt.*;
+import java.awt.geom.Ellipse2D;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.Writer;
 import java.util.*;
+import java.util.List;
 
 public class KinaseAnalyzer {
 
@@ -54,35 +71,33 @@ public class KinaseAnalyzer {
 
     HashMap<String, Integer> kinaseToColumnIndex;
 
+   List<String> kinaseBH;
+
+   HashMap<String, Double> signedPValues;
+
     public KinaseAnalyzer(ProteomicsLoader pL){
 
         this.pL = pL;
 
         this.kN = new KinaseLibrary();
 
+        sP = new SpearmansCorrelation();
+
         rankingObject = new NaturalRanking();
 
         pValues = new HashMap<>();
 
-
-
-        sP = new SpearmansCorrelation();
-
-
-
+        signedPValues = new HashMap<>();
 
         kinasePeptideScoresList = new HashMap<>();
 
         changeValues = new ArrayList<>();
 
+        kinasePVal = new HashMap<>();
+
         // InitializeSequenceKScores will initialize both kinasePeptideScoreList
         // and changeValues
         initializeSequenceKScores();
-
-        kinasePVal = new HashMap<>();
-
-
-        List<Double> nullDistribution = generateNullDistribution(changeValues, changeValues);
 
 
         kinaseColumnIndex();
@@ -91,23 +106,25 @@ public class KinaseAnalyzer {
 
         generatePValues();
 
+        // Alternative method:
+        initializeKinasePVal();
 
-        // Iterate through every kinase
-        for(String kinase: kinasePeptideScoresList.keySet()){
-            // Get its corresponding score list from the map(analagous to a column)
-            List<Double> scoreList = kinasePeptideScoresList.get(kinase);
-            // Get the correlation coefecient between that and the changeValues
-            double coeff = listCorrelationCoeffecient(changeValues, scoreList);
-            // Call getPValue() to calculate the p value
-            double pVal = getPValue(nullDistribution, coeff);
-            // Store it into the new map
-            kinasePVal.put(kinase, pVal);
-        }
 
+        // This chunk of code is just setting up pValues nad kinasePValues to compare two methods
         int count = 0;
         int totalCount = 0;
+        double[] pValues1 = new double[pValues.keySet().size()];
+        double[] pValues2 = new double[pValues.keySet().size()];
+        LibraryPValueGenerator lN = new LibraryPValueGenerator(pL);
+        HashMap<String, Double> map = lN.pValueMap;
         for(String kinase: pValues.keySet()){
             System.out.println(pValues.get(kinase) + " " + kinasePVal.get(kinase));
+            pValues1[totalCount] = pValues.get(kinase);
+            pValues2[totalCount] = map.get(kinase);
+            if(!pValues.get(kinase).equals(map.get(kinase))){
+               System.out.println("ERROR");
+               System.exit(1);
+            }
             totalCount++;
             if(pValues.get(kinase) < 0.005){
                 count++;
@@ -115,11 +132,31 @@ public class KinaseAnalyzer {
         }
         System.out.println("Final count is: " + count + " total count is " + totalCount);
 
-        System.out.println(FDR.select(pValues, null, 0.3).size());
+        System.out.println("Benjamini hochberg results: ");
 
-        System.out.println(FDR.decideBestFDR_BH(pValues, null));
+        kinaseBH = FDR.select(pValues, null, 0.05);
+        System.out.println(FDR.select(pValues, null, 0.05).size());
 
-        System.exit(1);
+
+
+
+        // Stuff to display the scatter plot
+
+        SwingUtilities.invokeLater(() -> {
+            chartingPValues example = new chartingPValues("Scatter Chart Example", pValues1, pValues2);
+            example.setSize(800, 400);
+            example.setLocationRelativeTo(null);
+            example.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+            example.setVisible(true);
+        });
+
+
+
+
+        // resultsToFile("C:\\Users\\25jul\\OneDrive\\Desktop\\resultsFile");
+
+
+
 
 
 
@@ -131,9 +168,61 @@ public class KinaseAnalyzer {
 
     }
 
+    public HashMap<String, Double> returnMap(){
+        return pValues;
+    }
 
+
+    public void initializeKinasePVal(){
+        List<Double> nullDistribution = generateNullDistribution(changeValues, changeValues);
+        // Iterate through every kinase
+        for(String kinase: kinasePeptideScoresList.keySet()){
+            // Get its corresponding score list from the map(analagous to a column)
+            List<Double> scoreList = kinasePeptideScoresList.get(kinase);
+            // Get the correlation coefecient between that and the changeValues
+            double coeff = listCorrelationCoeffecient(changeValues, scoreList);
+            // Call getPValue() to calculate the p value
+            double pVal = getPValue(nullDistribution, coeff);
+            // Store it into the new map
+            kinasePVal.put(kinase, pVal);
+        }
+    }
+
+    public void resultsToFile(String fileName){
+
+        // qVals is a map for each kinase, and it will calculate the FDR
+        // assuming that the kinase's pvalue is used as the threshold
+        Map<String, Double> qVals= FDR.getQVals(pValues, null);
+        try{
+            Writer w = new FileWriter(fileName);
+            w.write("Kinase\tpValues\n");
+            for(String kinase: kinaseBH){
+                w.write(kinase + "\t" + signedPValues.get(kinase) +"\t" + qVals.get(kinase));
+                w.write("\n");
+            }
+
+            w.close();
+        }
+        catch(Exception e){
+
+        }
+
+    }
+
+
+    /**
+     * Method will generate pValues by taking the associated pValue with
+     * correlation coeffecient between peptide-change column(first column
+     * in matrix instance variable) and every other column(all columns corresponding
+     * to kinase's and their scores for each peptide)
+     * These pValues will be stored into p-value map
+     */
     public void generatePValues(){
-        RealMatrix r = new PearsonsCorrelation(matrix).getCorrelationPValues();
+        PearsonsCorrelation pC = new PearsonsCorrelation(matrix);
+
+        RealMatrix r = pC.getCorrelationPValues();
+
+        RealMatrix r1 = pC.getCorrelationMatrix();
 
         for(int i = 1; i < r.getColumnDimension(); i++){
             // Get the p-value corresponding to correlation coeff between col 0, i
@@ -142,6 +231,14 @@ public class KinaseAnalyzer {
             String kinase = indexKinase.get(i);
             // Input into map
             pValues.put(kinase, pVal);
+
+
+            // Get the correlation coeffecient for this kinase
+            double correlation = r1.getEntry(0, i);
+            // Get the sign of the correlation so that we can determine signed pValue
+            double signedPVal = correlation >= 0 ? pVal : pVal * -1;
+            // Put into signed p value map
+            signedPValues.put(kinase, signedPVal);
         }
     }
 
@@ -173,17 +270,27 @@ public class KinaseAnalyzer {
         return kinasePVal;
     }
 
+
+    /**
+     * A method that takes a null distribution and observation as arguments
+     * and tells you the proportion of test statistics in the null distribution
+     * that are as extreme or more extreme than your observation
+     * @param nullDistribution
+     * @param observation
+     * @return
+     */
     public double getPValue(List<Double> nullDistribution, double observation){
 
         int count = 0;
 
         for (Double nullVal : nullDistribution) {
-            if (Math.abs(nullVal) > Math.abs(observation)) {
+            if (Math.abs(nullVal) >= Math.abs(observation)) {
                 count++;
             }
         }
 
         return count/ ((double) nullDistribution.size());
+
     }
 
 
@@ -258,8 +365,6 @@ public class KinaseAnalyzer {
     }
 
     public void initializeMatrix(){
-        // For converting to ranks
-        RankingAlgorithm rankingObject = new NaturalRanking();
         // Map containing all change values as values
         HashMap<String, Double> seqChangeVal = pL.getSeqChangeValMap();
         // Matrix where each value in the first column is a change value for a given peptide
@@ -387,6 +492,61 @@ public class KinaseAnalyzer {
             }
 
             scoreRow++;
+
+        }
+    }
+
+    private class chartingPValues extends JFrame{
+        public chartingPValues(String title, double[] pVal1, double[] pVal2){
+            super(title);
+
+            XYDataset dataset = createDataSet(pVal1, pVal2);
+
+            JFreeChart chart = ChartFactory.createScatterPlot("P-Values calculated in two different ways",
+                    "X-axis", "Y-axis", dataset);
+
+            //Changes background color
+            org.jfree.chart.plot.XYPlot plot = (XYPlot)chart.getPlot();
+
+            XYItemRenderer renderer = plot.getRenderer();
+
+// Set the size and shape of the points for the first series (Boys)
+            renderer.setSeriesShape(0, new Ellipse2D.Double(-2, -2, 4, 4));
+            renderer.setSeriesPaint(0, Color.BLUE);
+
+// Set the size and shape of the points for the second series (Girls)
+            renderer.setSeriesShape(1, new Ellipse2D.Double(-2, -2, 6, 6));
+            renderer.setSeriesPaint(1, Color.RED);
+
+            plot.setBackgroundPaint(new Color(255,228,196));
+
+
+            // Create Panel
+            ChartPanel panel = new ChartPanel(chart);
+            setContentPane(panel);
+
+        }
+
+        public XYDataset createDataSet(double[] pVal1, double[] pVal2){
+            XYSeriesCollection dataSet = new XYSeriesCollection();
+
+            XYSeries series1 = new XYSeries("First Series");
+
+            for(int i = 0; i < pVal1.length; i++){
+                series1.add(pVal1[i], pVal2[i]);
+            }
+
+            dataSet.addSeries(series1);
+
+            XYSeries series2 = new XYSeries("Second Series");
+
+            for(double i = 0; i < 1; i = i + 0.001){
+                series2.add(i, i);
+            }
+
+            dataSet.addSeries(series2);
+
+            return dataSet;
 
         }
     }
