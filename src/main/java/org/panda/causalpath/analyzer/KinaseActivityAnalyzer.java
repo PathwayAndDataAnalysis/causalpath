@@ -9,10 +9,10 @@ import java.io.Writer;
 import java.util.Map;
 
 public class KinaseActivityAnalyzer {
-    PValueCalculator pCalc;
-    Map<String, Double> signedPValues;
+    private PValueCalculator pCalc;
+    private Map<String, Double> signedPValues;
     public KinaseActivityAnalyzer(ProteomicsLoader pL, String directory){
-        pCalc = new LibraryPValueGenerator(pL);
+        pCalc = new LibraryPValueCalculator(pL);
         signedPValues = pCalc.getSignedPValues();
         resultsToFile(directory);
     }

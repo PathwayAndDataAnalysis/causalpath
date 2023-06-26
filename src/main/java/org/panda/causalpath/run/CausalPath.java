@@ -520,27 +520,7 @@ public class CausalPath
 			loader.associateChangeDetector(new ThresholdDetector(0.1, ThresholdDetector.AveragingMethod.FIRST_VALUE), data -> data instanceof ActivityData);
 		}
 
-		// Test
-		System.out.println("LET THE TESTING BEGIN");
-		EmpiricalPValueGenerator eM = new EmpiricalPValueGenerator(loader);
-		KinaseAnalyzer kN = new KinaseAnalyzer(loader);
-		for(String kinase: kN.getKinasePVal().keySet()){
-			System.out.println(kinase + " " + kN.getKinasePVal().get(kinase) + " " + eM.getPValues().get(kinase));
-		}
-		System.out.println("Second set of tests");
-		LibraryPValueGenerator lN = new LibraryPValueGenerator(loader);
-		for(String kinase: lN.getPValues().keySet()){
-			System.out.println(lN.getPValues().get(kinase) + " " + kN.returnMap().get(kinase));
-		}
 
-
-		KinaseActivityAnalyzer kNA = new KinaseActivityAnalyzer(loader, directory);
-
-
-
-
-
-		// End of test
 
 
 		rows = null;

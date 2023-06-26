@@ -4,16 +4,15 @@ import org.apache.commons.math3.linear.BlockRealMatrix;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
 import org.panda.causalpath.resource.ProteomicsLoader;
-import org.panda.resource.KinaseLibrary;
 
 import java.util.*;
 
-public class EmpiricalPValueGenerator extends PValueCalculator{
+public class EmpiricalPValueCalculator extends PValueCalculator{
 
     SpearmansCorrelation sP;
 
 
-    public EmpiricalPValueGenerator(ProteomicsLoader pL) {
+    public EmpiricalPValueCalculator(ProteomicsLoader pL) {
         super(pL);
         this.sP = new SpearmansCorrelation(new BlockRealMatrix(matrix));
         initializePValueMap();
@@ -31,7 +30,7 @@ public class EmpiricalPValueGenerator extends PValueCalculator{
         return signedPValueMap;
     }
 
-    public List<Double> getNullDistribution(){
+    private List<Double> getNullDistribution(){
         List<Double> list1 = new ArrayList<>();
         List<Double> list2 = new ArrayList<>();
 
@@ -45,7 +44,7 @@ public class EmpiricalPValueGenerator extends PValueCalculator{
 
 
 
-    public void initializePValueMap(){
+    private void initializePValueMap(){
 
         RealMatrix r = sP.getCorrelationMatrix();
 
@@ -65,7 +64,7 @@ public class EmpiricalPValueGenerator extends PValueCalculator{
         }
     }
 
-    public double getPValue(List<Double> nullDistribution, double observation){
+    private double getPValue(List<Double> nullDistribution, double observation){
 
         int count = 0;
 
@@ -79,7 +78,7 @@ public class EmpiricalPValueGenerator extends PValueCalculator{
 
     }
 
-    public List<Double> generateNullDistribution(List<Double> changeValues, List<Double> peptideScoresList){
+    private List<Double> generateNullDistribution(List<Double> changeValues, List<Double> peptideScoresList){
 
         ArrayList<Double> correlationCoeffecients = new ArrayList<>();
 

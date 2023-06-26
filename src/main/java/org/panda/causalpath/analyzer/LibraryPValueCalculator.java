@@ -5,20 +5,18 @@ import org.apache.commons.math3.stat.correlation.PearsonsCorrelation;
 import org.panda.causalpath.resource.ProteomicsLoader;
 
 import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-public class LibraryPValueGenerator extends PValueCalculator{
+public class LibraryPValueCalculator extends PValueCalculator{
 
     PearsonsCorrelation pC;
 
-    public LibraryPValueGenerator(ProteomicsLoader pL) {
+    public LibraryPValueCalculator(ProteomicsLoader pL) {
         super(pL);
         pC = new PearsonsCorrelation(matrix);
         setPValues();
     }
 
-    public void setPValues(){
+    private void setPValues(){
         RealMatrix r = pC.getCorrelationMatrix();
         RealMatrix r1 = pC.getCorrelationPValues();
 
