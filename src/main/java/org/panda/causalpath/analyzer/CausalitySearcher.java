@@ -703,6 +703,7 @@ public class CausalitySearcher implements Cloneable
 		this.useStrongestProteomicsDataForActivity = use;
 	}
 
+
 	public void setPrioritizeActivityData(boolean prioritizeActivityData)
 	{
 		this.prioritizeActivityData = prioritizeActivityData;

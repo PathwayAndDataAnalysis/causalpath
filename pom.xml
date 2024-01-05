@@ -10,6 +10,11 @@
 
 	<repositories>
 		<repository>
+			<id>central</id>
+			<name>Maven Central Repository</name>
+			<url>https://repo.maven.apache.org/maven2</url>
+		</repository>
+		<repository>
 			<id>panda</id>
 			<name>Repo for Pathway and Data Analysis</name>
 			<url>https://raw.githubusercontent.com/PathwayAndDataAnalysis/repo/master/maven-repo/</url>
@@ -50,6 +55,16 @@
 
 
 	<dependencies>
+		<dependency>
+			<groupId>net.maizegenetics</groupId>
+			<artifactId>tassel</artifactId>
+			<version>5.2.89</version>
+		</dependency>
+		<dependency>
+			<groupId>nz.ac.waikato.cms.weka</groupId>
+			<artifactId>weka-dev</artifactId>
+			<version>3.9.5</version>
+		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-core</artifactId>

@@ -1,12 +1,16 @@
 package org.panda.causalpath.run;
 
 import com.github.jsonldjava.utils.JsonUtils;
+import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
 import org.panda.causalpath.analyzer.*;
 import org.panda.causalpath.data.*;
+
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
 import org.panda.causalpath.network.RelationType;
+
+
 import org.panda.causalpath.resource.*;
 import org.panda.resource.HGNC;
 import org.panda.resource.ResourceDirectory;
@@ -20,6 +24,7 @@ import org.panda.utility.BooleanMatrixRandomizer;
 import org.panda.utility.FileUtil;
 import org.panda.utility.RandomizedMatrices;
 import org.panda.utility.statistics.FDR;
+import org.panda.utility.statistics.FishersExactTest;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -272,6 +277,10 @@ public class CausalPath
 	private RandomizedMatrices phosphoRM;
 	private RandomizedMatrices totProtRM;
 
+	// Test
+	private boolean kinaseLibrary = false;
+	// End of test
+
 	/**
 	 * The search engine.
 	 */
@@ -520,7 +529,14 @@ public class CausalPath
 			loader.associateChangeDetector(new ThresholdDetector(0.1, ThresholdDetector.AveragingMethod.FIRST_VALUE), data -> data instanceof ActivityData);
 		}
 
+		// Test
 
+		if(kinaseLibrary){
+			KinaseActivityAnalyzer kN = new KinaseActivityAnalyzer(loader, directory);
+		}
+
+
+		// End of Test
 
 
 		rows = null;
@@ -1087,6 +1103,7 @@ public class CausalPath
 	 */
 	enum ValueTransformation
 	{
+
 		AS_IS_SINGLE_VALUE("as-is-single-value", "This option should be selected when no transformation is desired, " +
 			"and there is a single value for each data row. Thresholding should be done using " +
 			"threshold-for-data-significance.", false),
@@ -1205,6 +1222,12 @@ public class CausalPath
 
 	enum Parameter
 	{
+		//Test
+		KINASE_LIBRARY((value, cp) -> cp.kinaseLibrary = Boolean.valueOf(value),
+				"Kinase Activity",
+				"If the user desires kinase activity output",
+				new EntryType(Boolean.class), new Boolean[][]{{Boolean.TRUE}}, true, false, null),
+		// End of test
 		PROTEOMICS_VALUES_FILE((value, cp) -> cp.proteomicsValuesFile = value,
 			"Proteomics values file",
 			"Path to the proteomics values file. It should have at least one ID column and one or more columns for " +

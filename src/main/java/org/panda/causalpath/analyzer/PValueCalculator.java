@@ -13,9 +13,9 @@ import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 import org.panda.causalpath.resource.ProteomicsLoader;
 import org.panda.resource.KinaseLibrary;
-
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -24,9 +24,12 @@ public abstract class PValueCalculator {
     ProteomicsLoader pL;
     KinaseLibrary kN;
     // A mapping to keep track of which kinase corresponds to which column
-    HashMap<String, Integer> kinaseColumn;
+    public HashMap<String, Integer> kinaseColumn;
     // A mapping to keep track of which column corresponds to which kinase
-    HashMap<Integer, String> columnKinase;
+    public HashMap<Integer, String> columnKinase;
+
+    // DELETE
+    public double[][] originalMatrix;
 
     public double[][] matrix;
 
@@ -52,6 +55,16 @@ public abstract class PValueCalculator {
 
     HashMap<String, Double> signedPValueMap;
 
+
+    // DELETE
+        public static double[][] copy2DArray(double[][] arr) {
+            double[][] copy = new double[arr.length][];
+            for (int i = 0; i < arr.length; i++) {
+                copy[i] = Arrays.copyOf(arr[i], arr[i].length);
+            }
+            return copy;
+        }
+
     /**
      * Main goal of constructor is to initialize matrix, a 2-d array
      * where the first column is the change value for each peptide, and
@@ -73,11 +86,14 @@ public abstract class PValueCalculator {
         kinaseColumn = new HashMap<>();
         columnKinase = new HashMap<>();
 
-        PearsonsCorrelation pC = new PearsonsCorrelation();
-
         setKinaseColumnMappings();
 
         initializeMatrix();
+
+
+        // DELETE LATER
+        originalMatrix = copy2DArray(matrix);
+
 
 
 
@@ -90,6 +106,8 @@ public abstract class PValueCalculator {
 
 
     }
+
+
 
     private void setKinaseColumnMappings(){
         // 1 is the first valid column, as the first column is reserved for peptide change values
