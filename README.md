@@ -1,4 +1,8 @@
-# CausalPath ![build status](https://github.com/pathwayanddataanalysis/causalpath/workflows/build/badge.svg)
+<!--
+Old badge URL just in case
+https://github.com/pathwayanddataanalysis/causalpath/workflows/build/badge.svg
+-->
+# CausalPath ![build status](https://github.com/pathwayanddataanalysis/causalpath/actions/workflows/maven.yml/badge.svg?event=push)
 This is a tool for pathway analysis of proteomic and phosphoproteomic datasets. CausalPath aims to identify mechanistic pathway relations that can explain observed correlations in experiments. In the below example, the mesenchymal subtype of ovarian cancer is compared against other subtypes. This graph is focused on the downregulation of MAPK3 in this subtype, suggesting several mechanisms that probably caused it (upstream), and showing its likely downstream effect.
 
 ![CausalPath sample output network](wiki/sample.png "Exploring the reasons for the downregulation of MAPK3 and its downstream effects.")
