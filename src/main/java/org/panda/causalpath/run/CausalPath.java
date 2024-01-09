@@ -1,7 +1,6 @@
 package org.panda.causalpath.run;
 
 import com.github.jsonldjava.utils.JsonUtils;
-import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
 import org.panda.causalpath.analyzer.*;
 import org.panda.causalpath.data.*;
 
@@ -24,7 +23,6 @@ import org.panda.utility.BooleanMatrixRandomizer;
 import org.panda.utility.FileUtil;
 import org.panda.utility.RandomizedMatrices;
 import org.panda.utility.statistics.FDR;
-import org.panda.utility.statistics.FishersExactTest;
 
 import java.io.BufferedWriter;
 import java.io.File;
