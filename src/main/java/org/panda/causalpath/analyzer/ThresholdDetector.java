@@ -88,6 +88,8 @@ public class ThresholdDetector implements OneDataChangeDetector
 	 */
 	public double foldChangeGeometricMean(double[] vals)
 	{
+		if (vals.length == 1) return vals[0];
+
 		double mult = 1;
 		int cnt = 0;
 		for (double val : vals)
@@ -96,7 +98,9 @@ public class ThresholdDetector implements OneDataChangeDetector
 			cnt++;
 			mult *= val < 0 ? -1 / val : val;
 		}
-		return Math.pow(mult, 1D / cnt);
+		double result = Math.pow(mult, 1D / cnt);
+		if (result < 1) result = - 1 / result;
+		return result;
 	}
 
 	public double maxOfAbs(double[] vals)
