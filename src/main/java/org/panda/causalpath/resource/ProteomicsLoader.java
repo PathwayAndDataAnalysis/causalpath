@@ -3,6 +3,7 @@ package org.panda.causalpath.resource;
 import org.panda.causalpath.analyzer.CausalityHelper;
 import org.panda.causalpath.analyzer.OneDataChangeDetector;
 import org.panda.causalpath.data.*;
+import org.panda.causalpath.log.CPLogger;
 import org.panda.causalpath.network.Relation;
 import org.panda.resource.UniProtSequence;
 import org.panda.resource.siteeffect.Feature;
@@ -58,6 +59,8 @@ public class ProteomicsLoader {
                 if (thr != null) {
                     double sd = Summary.stdev(((NumericData) ed).vals);
                     if (Double.isNaN(sd) || sd < thr) return;
+                } else if (CPLogger.isInitialized) {
+                    CPLogger.dataError.error("Stdev threshold not given for data type '" + type.toString() + "'");
                 }
             }
 
@@ -66,7 +69,9 @@ public class ProteomicsLoader {
 
                 // check if there is already some data with the same ID
                 for (ExperimentData data : dataMap.get(sym)) {
-                    if (data.getId().equals(ed.getId())) {
+                    if (CPLogger.isInitialized && data.getId().equals(ed.getId())) {
+                        CPLogger.dataError.error("Proteomic data has non-unique IDs: " + ed.getId());
+                    } else if (data.getId().equals(ed.getId())) {
                         throw new RuntimeException("Proteomic data has non-unique IDs: " + ed.getId());
                     }
                 }

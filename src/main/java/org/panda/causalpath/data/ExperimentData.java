@@ -1,6 +1,7 @@
 package org.panda.causalpath.data;
 
 import org.panda.causalpath.analyzer.OneDataChangeDetector;
+import org.panda.causalpath.exceptions.ThresholdNotSetException;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -57,7 +58,7 @@ public abstract class ExperimentData
 	{
 		if (chDet == null)
 		{
-			throw new RuntimeException("getChangeSign can be called only after setting the change detector.");
+			throw new ThresholdNotSetException("getChangeSign can be called only after setting the change detector.", this);
 		}
 
 		return chDet.getChangeSign(this);
@@ -67,7 +68,7 @@ public abstract class ExperimentData
 	{
 		if (chDet == null)
 		{
-			throw new RuntimeException("getChangeValue can be called only after setting the change detector.");
+			throw new ThresholdNotSetException("getChangeValue can be called only after setting the change detector.");
 		}
 
 		return chDet.getChangeValue(this);

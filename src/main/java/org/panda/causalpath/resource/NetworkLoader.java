@@ -1,5 +1,6 @@
 package org.panda.causalpath.resource;
 
+import org.panda.causalpath.data.DataType;
 import org.panda.causalpath.data.GeneWithData;
 import org.panda.causalpath.data.ProteinSite;
 import org.panda.causalpath.network.Relation;
@@ -418,6 +419,18 @@ public class NetworkLoader
 			return map;
 		}
 
+		public static String getValuesAsString()
+		{
+			StringBuilder sb = new StringBuilder();
+			for (ResourceType type : values())
+			{
+				sb.append(type.toString());
+				sb.append(", ");
+			}
+
+			sb.delete(sb.length() - 2, sb.length());
+			return sb.toString();
+		}
 	}
 
 

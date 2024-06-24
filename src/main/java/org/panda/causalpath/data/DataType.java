@@ -53,4 +53,17 @@ public enum DataType
 		map.put("values", list);
 		return map;
 	}
+
+	public static String getValuesAsString()
+	{
+		StringBuilder sb = new StringBuilder();
+		for (DataType type : values())
+		{
+			sb.append(type.getName());
+			sb.append(", ");
+		}
+
+		sb.delete(sb.length() - 2, sb.length());
+		return sb.toString();
+	}
 }

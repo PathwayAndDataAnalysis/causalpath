@@ -1,0 +1,68 @@
+<configuration>
+    <import class="ch.qos.logback.core.ConsoleAppender"/>
+    <import class="ch.qos.logback.core.FileAppender"/>
+    <import class="org.panda.causalpath.log.LazyFileAppender"/>
+    <import class="ch.qos.logback.classic.encoder.PatternLayoutEncoder"/>
+
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+
+    <variable name="InvalidParameterFilePath"/>
+
+    <appender name="STDOUT" class="ConsoleAppender">
+        <encoder class="PatternLayoutEncoder">
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="InvalidParameterErrorFileAppender" class="LazyFileAppender">
+        <file>${InvalidParameterFilePath}/invalid-parameter-errors.log</file>
+        <append>false</append>
+        <encoder class="PatternLayoutEncoder">
+            <pattern>%logger{35} - %msg%n%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="InvalidParameterWarningFileAppender" class="LazyFileAppender">
+        <file>${InvalidParameterFilePath}/invalid-parameter-warnings.log</file>
+        <append>false</append>
+        <encoder class="PatternLayoutEncoder">
+            <pattern>%logger{35} - %msg%n%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="InvalidDataErrorFileAppender" class="LazyFileAppender">
+        <file>${InvalidParameterFilePath}/invalid-data-errors.log</file>
+        <append>false</append>
+        <encoder class="PatternLayoutEncoder">
+            <pattern>%logger{35} - %msg%n%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="InvalidDataWarningFileAppender" class="LazyFileAppender">
+        <file>${InvalidParameterFilePath}/invalid-data-warnings.log</file>
+        <append>false</append>
+        <encoder class="PatternLayoutEncoder">
+            <pattern>%logger{35} - %msg%n%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="InvalidParameterErrors" level = "ERROR" additivity="true">
+        <appender-ref ref="InvalidParameterErrorFileAppender"/>
+    </logger>
+
+    <logger name="InvalidParameterWarnings" level = "WARNING" additivity="true">
+        <appender-ref ref="InvalidParameterWarningFileAppender"/>
+    </logger>
+
+    <logger name="InvalidDataErrors" level = "ERROR" additivity="true">
+        <appender-ref ref="InvalidDataErrorFileAppender"/>
+    </logger>
+
+    <logger name="InvalidDataWarnings" level = "WARN" additivity="true">
+        <appender-ref ref="InvalidDataWarningFileAppender"/>
+    </logger>
+
+    <root level="debug">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>

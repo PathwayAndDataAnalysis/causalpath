@@ -1,7 +1,10 @@
 package org.panda.causalpath.resource;
 
+import htsjdk.tribble.index.Index;
+import org.panda.causalpath.log.CPLogger;
 import org.panda.resource.siteeffect.Feature;
 import org.panda.resource.tcga.ProteomicsFileRow;
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -41,6 +44,16 @@ public class ProteomicsFileReader
 	 * @param siteCol name of the sites column
 	 * @param effectCol name of the effect column
 	 */
+
+	/**
+	 * Reads the annotation in a given proteomics file.
+	 *
+	 * @param filename name of the file
+	 * @param idCol name of the ID column
+	 * @param symbolCol name of the symbols column
+	 * @param siteCol name of the sites column
+	 * @param effectCol name of the effect column
+	 */
 	public static List<ProteomicsFileRow> readAnnotation(String filename, String idCol, String symbolCol,
 		String siteCol, String modCol, String effectCol) throws FileNotFoundException
 	{
@@ -56,14 +69,53 @@ public class ProteomicsFileReader
 		int modInd = modCol == null ? -1 : cols.indexOf(modCol);
 		int effectInd = effectCol == null ? -1 : cols.indexOf(effectCol);
 
+		String fileNameForError = filename.substring(filename.lastIndexOf("/") + 1);
+
+		if (colInd == -1 && CPLogger.isInitialized) CPLogger.dataError.error("ID column '" + idCol + "' not found in data file '" + fileNameForError + "'.");
+		if (symbolInd == -1 && CPLogger.isInitialized) CPLogger.dataError.error("Symbol column '" + symbolCol + "' not found in data file '" + fileNameForError + "'.");
+		if (siteInd == -1 && CPLogger.isInitialized) CPLogger.dataError.error("Site column '" + siteCol + "' not found in data file '" + fileNameForError + "'.");
+		if (modInd == - 1 && modCol != null && CPLogger.isInitialized)
+			CPLogger.dataError.error("Provided feature column '" + modCol + "' but column was not found in the data file '" + fileNameForError + "'.");
+		if (effectInd == - 1 && effectCol != null && CPLogger.isInitialized)
+			CPLogger.dataError.error("Provided effect column '" + effectCol + "' but column was not found in the data file '" + fileNameForError + "'.");
+
+		int line = 1;
 		while (sc.hasNextLine())
 		{
+			line++;
 			String[] row = sc.nextLine().split("\t");
 			String id = row[colInd];
 			String syms = row[symbolInd];
 			String sites = row.length > siteInd ? row[siteInd] : "";
-			Feature feature = modInd >= 0 && row.length > modInd ? Feature.getFeat(row[modInd]) : null;
-			String effect = effectInd >= 0 && row.length > effectInd ? row[effectInd] : null;
+			Feature feature = null;
+			String effect = null;
+
+			if (modInd >= 0 && row.length > modInd)
+			{
+				Feature f = Feature.getFeat(row[modInd]);
+				if (CPLogger.isInitialized && f == null)
+				{
+					CPLogger.dataWarning.warn("Line " + line + ": Feature '" + row[modInd] + "' is not recognized. Defaulting to no feature." +
+							"Possible features are: 'P', 'A', 'M', 'U', 'G', 'R', 'C'");
+				}
+				else
+				{
+					feature = f;
+				}
+			}
+
+			if (effectInd >= 0 && row.length > effectInd)
+			{
+				if (row[effectInd].equals("i") || row[effectInd].equals("a") || row[effectInd].equals("c") || row[effectInd].equals(""))
+				{
+					effect = row[effectInd];
+				}
+				else if (CPLogger.isInitialized)
+				{
+					CPLogger.dataWarning.warn("Line " + line + ": Effect '" + row[effectInd] + "' is not recognized. Defaulting to no effect." +
+							"Possible effects are: 'i', 'a', 'c', or leaving the field blank");
+				}
+			}
 
 			List<String> genes = Arrays.asList(syms.split("\\s+"));
 			Map<String, List<String>> siteMap = sites.isEmpty() ? null : new HashMap<>();
@@ -124,24 +176,41 @@ public class ProteomicsFileReader
 
 			int idInd = header.indexOf(idName);
 
-			if (idInd < 0) throw new RuntimeException("Cannot find \"" + idName + "\" column in values file.");
+			if (idInd < 0)
+			{
+				if (CPLogger.isInitialized) CPLogger.dataError.error("ID column '" + idName + "' not found in data file '" + filename + "'.");
+				throw new RuntimeException("Cannot find \"" + idName + "\" column in values file.");
+			}
 
 			int[] valInd = new int[colname.length];
 			for (int i = 0; i < colname.length; i++)
 			{
 				valInd[i] = header.indexOf(colname[i]);
-				if (valInd[i] == -1) throw new RuntimeException("Cannot find the column \"" + colname[i] + "\"");
+				if (valInd[i] == -1 && CPLogger.isInitialized)
+				{
+					CPLogger.dataError.error("Value column '" + colname[i] + "' not found in data file '" + filename + "'.");
+				}
 			}
 
+			int line = 1;
 			while (sc.hasNextLine())
 			{
+				line++;
 				String[] row = sc.nextLine().split("\t");
 
 				for (int i = 0; i < colname.length; i++)
 				{
 					double val;
 					try { val = Double.parseDouble(row[valInd[i]]); }
-					catch (NumberFormatException e){val = Double.NaN;}
+					catch (NumberFormatException e)
+					{
+						if (CPLogger.isInitialized) CPLogger.dataWarning.warn("Line " + line + ": Expected numerical input, instead value was '" + row[valInd[i]] + "'. Using default value instead.");
+						val = Double.NaN;
+					}
+					catch (IndexOutOfBoundsException e)
+					{
+						val = Double.NaN;
+					}
 
 					valMaps[i].put(row[idInd], val);
 				}

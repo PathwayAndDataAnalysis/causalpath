@@ -95,6 +95,7 @@ public class CausalitySearcher implements Cloneable
 	Map<Relation, Set<ExperimentData>> affectingSourceDataMap;
 	Map<Relation, Set<ExperimentData>> explainableTargetDataMap;
 
+
 	/**
 	 * Constructor with the reasoning type.
 	 * @param causal true:causal, false:conflicting
@@ -704,6 +705,8 @@ public class CausalitySearcher implements Cloneable
 	}
 
 
+	public boolean getPrioritizeActivityData() { return this.prioritizeActivityData; }
+
 	public void setPrioritizeActivityData(boolean prioritizeActivityData)
 	{
 		this.prioritizeActivityData = prioritizeActivityData;
@@ -714,10 +717,14 @@ public class CausalitySearcher implements Cloneable
 		generalActivityChangeIndicators.add(type);
 	}
 
+	public boolean getForceSiteMatching() { return this.forceSiteMatching; }
+
 	public void setForceSiteMatching(boolean forceSiteMatching)
 	{
 		this.forceSiteMatching = forceSiteMatching;
 	}
+
+	public int getSiteProxitmityThreshold() { return this.siteProximityThreshold; }
 
 	public void setSiteProximityThreshold(int siteProximityThreshold)
 	{

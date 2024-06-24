@@ -198,5 +198,18 @@ public class GraphFilter
 			map.put("values", list);
 			return map;
 		}
+
+		public static String getNamesAsString()
+		{
+			StringBuilder sb = new StringBuilder();
+			for (RelationFilterType type : values())
+			{
+				sb.append(type.getName());
+				sb.append(", ");
+			}
+
+			sb.delete(sb.length() - 2, sb.length());
+			return sb.toString();
+		}
 	}
 }

@@ -1,10 +1,13 @@
 package org.panda.causalpath.run;
 
 import com.github.jsonldjava.utils.JsonUtils;
-import org.apache.commons.math3.stat.correlation.SpearmansCorrelation;
+import org.forester.protein.Protein;
 import org.panda.causalpath.analyzer.*;
 import org.panda.causalpath.data.*;
 
+import org.panda.causalpath.exceptions.*;
+import org.panda.causalpath.log.CPLogger;
+import org.panda.causalpath.log.FileUtility;
 import org.panda.causalpath.network.GraphFilter;
 import org.panda.causalpath.network.GraphWriter;
 import org.panda.causalpath.network.Relation;
@@ -24,7 +27,6 @@ import org.panda.utility.BooleanMatrixRandomizer;
 import org.panda.utility.FileUtil;
 import org.panda.utility.RandomizedMatrices;
 import org.panda.utility.statistics.FDR;
-import org.panda.utility.statistics.FishersExactTest;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -32,6 +34,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -314,15 +317,27 @@ public class CausalPath
 
 		if (args.length > 1 && args[1].equals("-ws")) webServerMode = true;
 
-		new CausalPath(args[0]).run();
+		CausalPath cp = new CausalPath(args[0]);
+
+		if (cp.HasParameterWarnings())
+		{
+			System.out.println("Warnings found in the parameters file. View the log file at: " + CPLogger.getParameterWarningLogFilePath());
+		}
+		if (cp.HasParameterErrors()) {
+			System.out.println("Errors found in the parameters file. View the log file at: " + CPLogger.getParameterErrorLogFilePath());
+			return;
+		}
+
+		cp.run();
 	}
 
 	public CausalPath(String directory) throws IOException
 	{
 		this.directory = directory;
 		this.cs = new CausalitySearcher(true);
-
+		CPLogger.Initialize(directory);
 		readParameters();
+		checkParametersValidity();
 	}
 
 	private void readParameters() throws IOException
@@ -337,9 +352,235 @@ public class CausalPath
 	{
 		Parameter param = Parameter.findEnum(key);
 
-		if (param == null) throw new RuntimeException("Unknown parameter: " + key);
+		if (param == null)
+		{
+			CPLogger.paramError.error("Unrecognized parameter: " + key);
+			return;
+		}
 
-		param.reader.read(value, this);
+		//  Set all the instance variables that correspond to the given parameters while catching basic formatting errors
+		try
+		{
+			param.reader.read(value, this);
+		}
+		catch (NumberFormatException nfe)
+		{
+ 			CPLogger.paramError.error(key + " requires a numerical input. Input was: '" + value + "'.");
+		}
+		catch (BooleanFormatException bfe)
+		{
+			CPLogger.paramError.error(key + " has to be true or false. Input was: '" + value + "'.");
+		}
+		catch (IllegalValueTransformationException vte)
+		{
+			CPLogger.paramError.error("Value transformation '" + value + "' not recognized. Possible values are: " + ValueTransformation.getNamesAsString() + ".");
+		}
+		catch (IllegalThresholdDataFormatException tde)
+		{
+			CPLogger.paramError.error(tde.getMessage() + " '" + value + "' not recognized. " + tde.getMessage() + " must be in the form of an integer and valid data type separated by a space." +
+					" For example: '1 phosphoprotein' or '2 protein'. Possible data types are: " + DataType.getValuesAsString() + ".");
+		}
+		catch (IllegalNetworkResourceException nre)
+		{
+			CPLogger.paramError.error("Built-in network resource selection '" + value + "' not recognized. Possible values are: " + NetworkLoader.ResourceType.getValuesAsString() + ".");
+		}
+		catch (IllegalRelationFilterException rfe)
+		{
+			CPLogger.paramError.error("Relation filter type '" + value + "' not recognized. Possible values are: " + GraphFilter.RelationFilterType.getNamesAsString() + ".");
+		}
+		catch (IllegalDataTypeException ide)
+		{
+			CPLogger.paramError.error(ide.getMessage() + " '" + value + "' not recognized. Possible values are: " + ide.getValidValues());
+		}
+		catch (IllegalGeneActivityLabelException ale)
+		{
+			CPLogger.paramError.error("gene-activity: '" + value + "' not recognized. Parameter must be in the format of a gene name and activity label " +
+					"separated by a space. The activity label can either be a for active of i for inactive. For example: 'BRAF a', or 'PTEN i'");
+		}
+		catch (IllegalDirectoryException ide)
+		{
+			CPLogger.paramError.error(ide.getMessage());
+		}
+		catch (FileDoesNotExistException fde)
+		{
+			CPLogger.paramError.error(fde.getMessage());
+		}
+	}
+
+	private void checkParametersValidity()
+	{
+		// More complex error handling after reading all the parameters
+		// Check required parameters
+		if (proteomicsValuesFile == null) CPLogger.paramError.error("proteomics-values-file is REQUIRED but was not provided");
+		if (IDColumn == null) CPLogger.paramError.error("id-column is REQUIRED but was not provided");
+		if (symbolsColumn == null) CPLogger.paramError.error("symbols-column is REQUIRED but was not provided");
+		if (sitesColumn == null) CPLogger.paramError.error("sites-column is REQUIRED but was not provided");
+		if (transformation == null) CPLogger.paramError.error("value-transform is REQUIRED but was not provided");
+		if (valueColumn == null && controlValueColumn == null && testValueColumn == null)
+			CPLogger.paramError.error("Either value-column OR (control-value-column AND test-value-column) are REQUIRED," +
+			"but neither were provided");
+
+		if (valueColumn != null && controlValueColumn != null) CPLogger.paramError.error("value-column and control-value-column are mutually exclusive");
+		if (valueColumn != null && testValueColumn != null) CPLogger.paramError.error("value-column and test-value-column are mutually exclusive");
+
+		// Check if given files exist
+		if (proteomicsValuesFile != null && !FileUtility.fileExists(adjustFileLocation(proteomicsValuesFile)))
+			CPLogger.paramError.error("Provided filepath for proteomics-value-file: '" + proteomicsValuesFile + "' does not exist");
+		if (rnaExpressionFile != null && !FileUtility.fileExists(adjustFileLocation(rnaExpressionFile)))
+			CPLogger.paramError.error("Provided filepath for rna-expression-file: '" + rnaExpressionFile + "' does not exist");
+		if (acetylProteomicFile != null && !FileUtility.fileExists(adjustFileLocation(acetylProteomicFile)))
+			CPLogger.paramError.error("Provided filepath for acetyl-proteomic-file: '" + acetylProteomicFile + "' does not exist");
+		if (methylProteomicFile != null && !FileUtility.fileExists(adjustFileLocation(methylProteomicFile)))
+			CPLogger.paramError.error("Provided filepath for methyl-proteomic-file: '" + methylProteomicFile + "' does not exist");
+		if (mutationEffectFilename != null && !FileUtility.fileExists(adjustFileLocation(mutationEffectFilename)))
+			CPLogger.paramError.error("Provided filepath for mutation-effect-file: '" + mutationEffectFilename + "' does not exist");
+		if (tfActivityFile != null && !FileUtility.fileExists(tfActivityFile))
+			CPLogger.paramError.error("Provided filepath for tf-activity-file: '" + tfActivityFile + "' does not exist");
+		if (customCausalPriorsFile != null && !FileUtility.fileExists(customCausalPriorsFile))
+			CPLogger.paramError.error("Provided filepath for custom-causal-priors-file: '" + customCausalPriorsFile + "' does not exist");
+
+		// Check value columns
+		if (transformation == ValueTransformation.AS_IS_SINGLE_VALUE || transformation == ValueTransformation.SIGNED_P_VALUES)
+		{
+			if (valueColumn == null || valueColumn.isEmpty())
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires one value column");
+		}
+		else if (transformation == ValueTransformation.ARITHMETIC_MEAN || transformation == ValueTransformation.GEOMETRIC_MEAN ||
+				transformation == ValueTransformation.MAX)
+		{
+			if (valueColumn == null || valueColumn.isEmpty())
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires one or more value columns");
+		}
+		else if (transformation == ValueTransformation.DIFFERENCE_OF_MEANS || transformation == ValueTransformation.FOLD_CHANGE_OF_MEAN ||
+				transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN)
+		{
+			if (controlValueColumn == null || controlValueColumn.isEmpty())
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires one or more control value columns");
+			if (testValueColumn == null || testValueColumn.isEmpty())
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires one or more test value columns");
+		}
+		else if (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED)
+		{
+			if (controlValueColumn == null || controlValueColumn.isEmpty())
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires one or more control value columns");
+			if (testValueColumn == null || testValueColumn.isEmpty())
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires one or more test value columns");
+			if (controlValueColumn != null && testValueColumn != null && controlValueColumn.size() != testValueColumn.size())
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires an equal amount of control and test" +
+						"value columns. There are currently " + controlValueColumn.size() + " control value columns provided and " + testValueColumn.size() +
+						" test value columns provided.");
+		}
+		else if (transformation == ValueTransformation.CORRELATION)
+		{
+			if (valueColumn == null || valueColumn.size() < 3)
+				CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires three or more test value columns");
+		}
+
+		// Check threshold-data-for-significance
+		if (thresholdForDataSignificance != null && fdrThresholdForDataSignificance != null)
+			CPLogger.paramError.error("threshold-for-data-significance and fdr-threshold-for-data-significance are mutually exclusive");
+
+		if (transformation == ValueTransformation.CORRELATION)
+		{
+			if (thresholdForDataSignificance != null)
+				CPLogger.paramWarning.warn("threshold-for-data-significance will be ignored because value-transformation is correlation");
+			if (fdrThresholdForDataSignificance != null)
+				CPLogger.paramWarning.warn("fdr-threshold-for-data-significance will be ignored because value-transformation is correlation");
+		}
+		else if (transformation != ValueTransformation.ERROR)
+		{
+			if (transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN || transformation == ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED ||
+				transformation == ValueTransformation.SIGNED_P_VALUES)
+			{
+				if (thresholdForDataSignificance == null && fdrThresholdForDataSignificance == null)
+					CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires either threshold-for-data-significance or " +
+							"fdr-threshold-for-data-significance");
+			}
+			else{
+				if (thresholdForDataSignificance == null)
+					CPLogger.paramError.error("value-transformation: '" + transformation.name + "' requires threshold-for-data-significance");
+				if (fdrThresholdForDataSignificance != null)
+					CPLogger.paramError.error("value-transformation: '" + transformation.name + "' does not use fdr-threshold-for-data-significance");
+			}
+		}
+
+		// Check parameters that are only used with correlation
+		if (pvalThresholdForCorrelation != -1 && fdrThresholdForCorrelation != -1)
+			CPLogger.paramError.error("pval-threshold-for-correlation and fdr-threshold-for-correlation are mutually exclusive");
+		if (transformation != ValueTransformation.CORRELATION && transformation != ValueTransformation.ERROR)
+		{
+			if (correlationValueThreshold != -1)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use correlation-value-threshold. " +
+						"correlation-value-threshold will be ignored");
+			if (correlationUpperThreshold != null)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use correlation-upper-threshold. " +
+						"correlation-upper-threshold will be ignored");
+			if (pvalThresholdForCorrelation != -1)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use pval-threshold-for-correlation. " +
+						"pval-threshold-for-correlation will be ignored");
+			if (fdrThresholdForCorrelation != -1)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use fdr-threshold-for-correlation. " +
+						"fdr-threshold-for-correlation will be ignored");
+		}
+
+		// Check calculate for network significance related parameters
+		if (!calculateNetworkSignificance && webServerMode)
+		{
+			if (permutationCount != 1000)
+				CPLogger.paramWarning.warn("permutations-for-significance will be ignored because resources are limited on web server");
+			if (fdrThresholdForNetworkSignificance != 0.1)
+				CPLogger.paramWarning.warn("fdr-threshold-for-network-significance will be ignored because resources are limited on web server");
+			if (useNetworkSignificanceForCausalReasoning)
+				CPLogger.paramWarning.warn("use-network-significance-for-causal-reasoning will be ignored because resources are limited on web server");
+			if (minimumPotentialTargetsToConsiderForDownstreamSignificance != 5)
+				CPLogger.paramWarning.warn("minimum-potential-targets-to-consider-for-downstream-significance will be ignored because resources are limited on web server");
+		}
+		else if (!calculateNetworkSignificance)
+		{
+			if (permutationCount != 1000)
+				CPLogger.paramWarning.warn("permutations-for-significance will be ignored because calculate-network-significance is false");
+			if (fdrThresholdForNetworkSignificance != 0.1)
+				CPLogger.paramWarning.warn("fdr-threshold-for-network-significance will be ignored because calculate-network-significance is false");
+			if (useNetworkSignificanceForCausalReasoning)
+				CPLogger.paramWarning.warn("use-network-significance-for-causal-reasoning will be ignored because calculate-network-significance is false");
+			if (minimumPotentialTargetsToConsiderForDownstreamSignificance != 5)
+				CPLogger.paramWarning.warn("minimum-potential-targets-to-consider-for-downstream-significance will be ignored because calculate-network-significance is false");
+		}
+
+		if (transformation == ValueTransformation.CORRELATION && cs.getPrioritizeActivityData())
+			CPLogger.paramError.error("value-transformation: '" + transformation.name + "' does not use prioritize-activity-data");
+
+		if (!cs.getForceSiteMatching() && cs.getSiteProxitmityThreshold() != 0)
+			CPLogger.paramWarning.warn("site-match-proximity-threshold will be ignored because do-site-matching is false");
+
+		// Check parameters not supposed to be used with correlation
+		if (transformation == ValueTransformation.CORRELATION)
+		{
+			if (colorSaturationValue != 1)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use color-saturation-value. " +
+						"color-saturation-value will be ignored");
+			if (showAllGenesWithProteomicData)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use show-all-genes-with-proteomic-data. " +
+						"show-all-genes-with-proteomic-data will be ignored");
+			if (showInsignificantData)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use show-insignificant-data. " +
+						"show-insignificant-data will be ignored");
+			if (hideDataNotPartOfCausalRelations)
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use hide-data-not-part-of-causal-relations. " +
+						"hide-data-not-part-of-causal-relations will be ignored");
+			if (!activityMap.isEmpty())
+				CPLogger.paramWarning.warn("value-transformation: '" + transformation.name + "' does not use gene-activity. " +
+						"gene-activity will be ignored");
+		}
+	}
+
+	public boolean HasParameterErrors() {
+		return CPLogger.parameterErrorLogFileExists();
+	}
+
+	public boolean HasParameterWarnings()
+	{
+		return CPLogger.parameterWarningLogFileExists();
 	}
 
 	/**
@@ -391,10 +632,24 @@ public class CausalPath
 			IDColumn, vals, defaultMissingValue, doLogTransfrorm);
 
 		// Add activity changes from a tf activity analysis
-		readTFActivityFile(rows);
+		try
+		{
+			readTFActivityFile(rows);
+		}
+		catch (Exception e)
+		{
+			CPLogger.dataError.error("Something went wrong with the tf activity file");
+		}
 
 		// Add activity changes from parameters file
-		addActivityChangesFromParametersFile(rows);
+		try
+		{
+			addActivityChangesFromParametersFile(rows);
+		}
+		catch (Exception e)
+		{
+			CPLogger.dataError.error("Something went wrong adding activity changes from the parameters file");
+		}
 
 		// Fill-in missing effects
 		SiteEffectCollective sec = new SiteEffectCollective();
@@ -568,7 +823,31 @@ public class CausalPath
 		//---END OF DEBUG
 
 		// Search causal or conflicting relations
-		Set<Relation> causal = cs.run(relations);
+		Set<Relation> causal = null;
+		try
+		{
+			causal = cs.run(relations);
+		}
+		catch (ThresholdNotSetException e)
+		{
+			ExperimentData data = e.getExperimentData();
+			String dataForMessage = "";
+			if (data instanceof SiteModProteinData && ((SiteModProteinData) data).getModification().equals(Feature.PHOSPHORYLATION)) {
+				dataForMessage = "phosphoprotein";
+			} else if (data instanceof SiteModProteinData && ((SiteModProteinData) data).getModification().equals(Feature.ACETYLATION)) {
+				dataForMessage = "acetylprotein";
+			} else if (data instanceof SiteModProteinData && ((SiteModProteinData) data).getModification().equals(Feature.METHYLATION)) {
+			dataForMessage = "methylprotein";
+			} else if (data instanceof ProteinData && !(data instanceof SiteModProteinData)) {
+				dataForMessage = "protein";
+			} else if (data instanceof RNAData) {
+				dataForMessage = "rna";
+			} else if (data instanceof MetaboliteData) {
+				dataForMessage = "metabolite";
+			}
+			CPLogger.dataError.error("Make sure that threshold data for significance/fdr threshold data for significance " +
+					"is set for every data type in the sample. It is not currently set for " + dataForMessage + " and potentially more.");
+		}
 
 //		cs.writePairsUsedForInferenceWithCorrelations("/home/ozgun/Documents/Temp/before.txt");
 
@@ -1070,7 +1349,7 @@ public class CausalPath
 		}
 		catch (IOException e)
 		{
-			throw new RuntimeException(e);
+			throw new FileDoesNotExistException("Provided filepath for hgnc-file: '" + file + "' does not exist", e);
 		}
 	}
 
@@ -1164,7 +1443,10 @@ public class CausalPath
 
 		CORRELATION("correlation", "There should be one group of values (marked with value-column). There must be at " +
 			"least 3 value columns technically, but many more than that practically to have some statistical power " +
-			"for significant correlation. ", false);
+			"for significant correlation. ", false),
+
+		ERROR("error", "This option should not be selected. This option is here to internally let the program know there " +
+			"is an error with the value transformation.", false);
 
 		ValueTransformation(String name, String description, boolean twoGroupComparison)
 		{
@@ -1187,7 +1469,7 @@ public class CausalPath
 			{
 				if (trans.name.equals(name)) return trans;
 			}
-			return null;
+			return ValueTransformation.ERROR;
 		}
 
 		public boolean isTwoGroupComparison()
@@ -1200,6 +1482,7 @@ public class CausalPath
 			StringBuilder sb = new StringBuilder();
 			for (ValueTransformation trans : values())
 			{
+				if (trans.name.equals("error")) continue;
 				sb.append("\t").append(trans.name).append(": ").append(trans.description).append("\n");
 			}
 			return sb.toString();
@@ -1210,6 +1493,7 @@ public class CausalPath
 			List list = new ArrayList<>();
 			for (ValueTransformation transformation : values())
 			{
+				if (transformation.name.equals("error")) continue;
 				list.add(transformation.name);
 			}
 
@@ -1218,12 +1502,26 @@ public class CausalPath
 			map.put("values", list);
 			return map;
 		}
+
+		public static String getNamesAsString()
+		{
+			StringBuilder sb = new StringBuilder();
+			for (ValueTransformation type : values())
+			{
+				if (type.name.equals("error")) continue;
+				sb.append(type.name);
+				sb.append(", ");
+			}
+
+			sb.delete(sb.length() - 2, sb.length());
+			return sb.toString();
+		}
 	}
 
 	enum Parameter
 	{
 		//Test
-		KINASE_LIBRARY((value, cp) -> cp.kinaseLibrary = Boolean.valueOf(value),
+		KINASE_LIBRARY((value, cp) -> cp.kinaseLibrary = BooleanUtil.parseBoolWithException(value),
 				"Kinase Activity",
 				"If the user desires kinase activity output",
 				new EntryType(Boolean.class), new Boolean[][]{{Boolean.TRUE}}, true, false, null),
@@ -1274,10 +1572,7 @@ public class CausalPath
 		VALUE_TRANSFORMATION((value, cp) ->
 		{
 			cp.transformation = ValueTransformation.fetch(value);
-			if (cp.transformation == null)
-			{
-				throw new RuntimeException("Value transformation \"" + value + "\" not recognized.");
-			}
+			if (cp.transformation == ValueTransformation.ERROR) throw new IllegalValueTransformationException();
 		},
 			"How to use values in the analysis",
 			"This parameter determines how to use the values in the proteomics file. Options are listed below. When " +
@@ -1328,7 +1623,7 @@ public class CausalPath
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.FOLD_CHANGE_OF_MEAN.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name))),
-		DO_LOG_TRANSFORM((value, cp) -> cp.doLogTransfrorm = Boolean.valueOf(value),
+		DO_LOG_TRANSFORM((value, cp) -> cp.doLogTransfrorm = BooleanUtil.parseBoolWithException(value),
 			"Log transform data values",
 			"Whether the proteomic values should be log transformed for the analysis. Possible values are 'true' and " +
 				"'false'. Default is false.",
@@ -1352,7 +1647,13 @@ public class CausalPath
 		{
 			if (cp.thresholdForDataSignificance == null) cp.thresholdForDataSignificance = new HashMap<>();
 			String[] s = value.split("\\s+");
-			cp.thresholdForDataSignificance.put(DataType.get(s[1]), Double.valueOf(s[0]));
+			try {
+				cp.thresholdForDataSignificance.put(DataType.get(s[1]), Double.valueOf(s[0]));
+			}
+			catch (IllegalArgumentException | IndexOutOfBoundsException e)
+			{
+				throw new IllegalThresholdDataFormatException("Threshold for data significance", e);
+			}
 		},
 			"Threshold value for significant data",
 			"A threshold value for selecting significant data. Use this parameter only when FDR controlling procedure" +
@@ -1367,7 +1668,13 @@ public class CausalPath
 		{
 			if (cp.fdrThresholdForDataSignificance == null) cp.fdrThresholdForDataSignificance = new HashMap<>();
 			String[] s = value.split("\\s+");
-			cp.fdrThresholdForDataSignificance.put(DataType.get(s[1]), Double.valueOf(s[0]));
+			try {
+				cp.fdrThresholdForDataSignificance.put(DataType.get(s[1]), Double.valueOf(s[0]));
+			}
+			catch (IllegalArgumentException | IndexOutOfBoundsException e)
+			{
+				throw new IllegalThresholdDataFormatException("FDR threshold for data significance", e);
+			}
 		},
 			"FDR threshold for data significance",
 			"False discovery rate threshold for data significance. This parameter can be set for each " +
@@ -1379,7 +1686,7 @@ public class CausalPath
 					new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
 					new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name)),
 				new Cond(THRESHOLD_FOR_DATA_SIGNIFICANCE.getText(), null))),
-		POOL_PROTEOMICS_FOR_FDR_ADJUSTMENT((value, cp) -> cp.poolProteomicsForFDRAdjustment = Boolean.valueOf(value),
+		POOL_PROTEOMICS_FOR_FDR_ADJUSTMENT((value, cp) -> cp.poolProteomicsForFDRAdjustment = BooleanUtil.parseBoolWithException(value),
 			"Pool proteomics data for FDR adjustment",
 			"Whether to consider proteomic and phosphoproteomic data as a single dataset during FDR adjustment. This " +
 				"is typically the case with RPPA data, and typically not the case with mass spectrometry data. Can be" +
@@ -1421,7 +1728,13 @@ public class CausalPath
 		{
 			if (cp.stDevThresholds == null) cp.stDevThresholds = new HashMap<>();
 			String[] s = value.split("\\s+");
-			cp.stDevThresholds.put(DataType.get(s[1]), Double.valueOf(s[0]));
+			try {
+				cp.stDevThresholds.put(DataType.get(s[1]), Double.valueOf(s[0]));
+			}
+			catch (IllegalArgumentException | IndexOutOfBoundsException e)
+			{
+				throw new IllegalThresholdDataFormatException("Standard deviation threshold for data", e);
+			}
 		},
 			"Standard deviation threshold for data",
 			"This parameter can be set for each different data type separately. The parameter value has to be in the" +
@@ -1444,7 +1757,18 @@ public class CausalPath
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN.name),
 				new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.SIGNIFICANT_CHANGE_OF_MEAN_PAIRED.name))),
-		CALCULATE_NETWORK_SIGNIFICANCE((value, cp) -> cp.calculateNetworkSignificance = webServerMode ? false : Boolean.valueOf(value),
+		CALCULATE_NETWORK_SIGNIFICANCE((value, cp) ->
+		{
+			boolean val = BooleanUtil.parseBoolWithException(value);
+			if (webServerMode && val)
+			{
+				CPLogger.paramWarning.warn("calculate-network-significance will be ignored due to resource limitations on the webserver");
+			}
+			else
+			{
+				cp.calculateNetworkSignificance = val;
+			}
+		},
 			"Calculate network significance",
 			"Whether to calculate significances of the properties of the graph. When turned on, a p-value for network" +
 				" size, and also downstream activity enrichment p-values for each gene on the graph are calculated. " +
@@ -1468,7 +1792,7 @@ public class CausalPath
 			new Cond(Logical.NOT)),
 //			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
 		USE_NETWORK_SIGNIFICANCE_FOR_CAUSAL_REASONING((value, cp) ->
-			cp.useNetworkSignificanceForCausalReasoning = Boolean.valueOf(value),
+			cp.useNetworkSignificanceForCausalReasoning = BooleanUtil.parseBoolWithException(value),
 			"Use network significance for causal reasoning",
 			"After calculation of network significances in a non-correlation-based analysis, this option introduces" +
 				" the detected active and inactive proteins as data to be used in the analysis. This applies only to " +
@@ -1477,7 +1801,7 @@ public class CausalPath
 			new Cond(Logical.NOT)),
 //			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		PRIORITIZE_ACTIVITY_DATA((value, cp) ->
-			cp.cs.setPrioritizeActivityData(Boolean.valueOf(value)),
+			cp.cs.setPrioritizeActivityData(BooleanUtil.parseBoolWithException(value)),
 			"Prioritize activity data over proteomic data for evidence of activity change",
 			"When there is an ActivityData associated to a protein (can be user hypothesis or inferred by network " +
 				"significance), do not use  other omic data for evidence of activity change in causal reasoning.",
@@ -1495,7 +1819,7 @@ public class CausalPath
 			new EntryType(Integer.class), new String[][]{{"5"}}, true, false,
 			new Cond(Logical.NOT)),
 //			new Cond(CALCULATE_NETWORK_SIGNIFICANCE.getText(), Boolean.TRUE)),
-		DO_SITE_MATCHING((value, cp) -> cp.cs.setForceSiteMatching(Boolean.valueOf(value)),
+		DO_SITE_MATCHING((value, cp) -> cp.cs.setForceSiteMatching(BooleanUtil.parseBoolWithException(value)),
 			"Do site matching",
 			"Whether to force site matching in causality analysis. True by default.",
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.TRUE}}, true, false, null),
@@ -1517,6 +1841,14 @@ public class CausalPath
 		BUILT_IN_NETWORK_RESOURCE_SELECTION((value, cp) ->
 		{
 			if (cp.networkSelection == null) cp.networkSelection = new HashSet<>();
+			try
+			{
+				NetworkLoader.ResourceType resourceType = NetworkLoader.ResourceType.valueOf(value);
+			}
+			catch (IllegalArgumentException iae)
+			{
+				throw new IllegalNetworkResourceException(iae);
+			}
 			cp.networkSelection.add(value);
 		},
 			"Built-in network resources to use",
@@ -1530,13 +1862,15 @@ public class CausalPath
 			false, true, null),
 		RELATION_FILTER_TYPE((value, cp) ->
 		{
+			GraphFilter.RelationFilterType filter = GraphFilter.RelationFilterType.get(value);
+			if (filter == null) throw new IllegalRelationFilterException();
 			if (cp.cs.hasNoGraphFilter())
 			{
-				cp.cs.setGraphFilter(new GraphFilter(value));
+				cp.cs.setGraphFilter(new GraphFilter(filter));
 			}
 			else
 			{
-				cp.cs.getGraphFilter().setRelationFilterType(GraphFilter.RelationFilterType.get(value));
+				cp.cs.getGraphFilter().setRelationFilterType(filter);
 			}
 		},
 			"Network relation-type filter",
@@ -1572,7 +1906,7 @@ public class CausalPath
 				"-log(p) with a sign associated to it.",
 			new EntryType(Double.class), new String[][]{{"10"}}, false, false,
 			new Cond( Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
-		SHOW_ALL_GENES_WITH_PROTEOMIC_DATA((value, cp) -> cp.showAllGenesWithProteomicData = Boolean.valueOf(value),
+		SHOW_ALL_GENES_WITH_PROTEOMIC_DATA((value, cp) -> cp.showAllGenesWithProteomicData = BooleanUtil.parseBoolWithException(value),
 			"Show all genes with significant proteomic data",
 			"CausalPath generates a result graph, but what about all other significant changes that could not make " +
 				"into the network? CausalPath puts those genes as disconnected nodes in the graph when the analysis " +
@@ -1580,14 +1914,14 @@ public class CausalPath
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.TRUE}}, true, false,
 			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		SHOW_INSIGNIFICANT_DATA((value, cp) ->
-			cp.showInsignificantData = Boolean.valueOf(value),
+			cp.showInsignificantData = BooleanUtil.parseBoolWithException(value),
 			"Show insignificant proteomic data on the graph",
 			"Option to make the insignificant protein data on the result graph visible. Seeing these is good for " +
 				"seeing what is being measured, but when they are too much, turning off generates a a better view.",
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false,
 			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		HIDE_DATA_NOT_PART_OF_CAUSAL_RELATIONS((value, cp) ->
-			cp.hideDataNotPartOfCausalRelations = Boolean.valueOf(value),
+			cp.hideDataNotPartOfCausalRelations = BooleanUtil.parseBoolWithException(value),
 			"Hide data which did not contribute causal relations",
 			"Limits the data drawn on the result graph to the ones that take part in the identified causal relations.",
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false,
@@ -1597,7 +1931,18 @@ public class CausalPath
 		DATA_TYPE_FOR_EXPRESSIONAL_TARGETS((value, cp) ->
 		{
 			if (cp.dataTypesForExpressionalTargets == null) cp.dataTypesForExpressionalTargets = new HashSet<>();
-			cp.dataTypesForExpressionalTargets.add(DataType.get(value));
+			try
+			{
+				DataType type = DataType.get(value);
+				if (type != DataType.RNA || type != DataType.PROTEIN) {
+					throw new IllegalDataTypeException("Data type for expressional targets", "rna and protein");
+				}
+				cp.dataTypesForExpressionalTargets.add(type);
+			}
+			catch (IllegalArgumentException iae)
+			{
+				throw new IllegalDataTypeException("Data type for expressional targets", iae, "rna and protein");
+			}
 		},
 			"Data type explainable by an expressional relation",
 			"By default, CausalPath generates explanations only for proteomic changes. But it is possible to explain " +
@@ -1606,7 +1951,7 @@ public class CausalPath
 				"expressional relations. Typical values are 'rna' and 'protein'. This parameter can also  be used " +
 				"multiple times to use rna and protein data together.",
 			new EntryType(DataType.class), new DataType[][]{{DataType.PROTEIN}}, false, true, null),
-		GENERATE_DATA_CENTRIC_GRAPH((value, cp) -> cp.generateDataCentricGraph = Boolean.valueOf(value),
+		GENERATE_DATA_CENTRIC_GRAPH((value, cp) -> cp.generateDataCentricGraph = BooleanUtil.parseBoolWithException(value),
 			"Generate a data-centric view as well",
 			"An alternative to the gene-centric graph of CausalPath is a data-centric graph where nodes are not genes" +
 				" but the data. This parameter forces to generate this type of result as well. False by default.",
@@ -1632,7 +1977,7 @@ public class CausalPath
 			new EntryType(File.class), null, false, false,
 			new Cond(Logical.NOT, new Cond(VALUE_TRANSFORMATION.getText(), ValueTransformation.CORRELATION.name))),
 		USE_STRONGEST_PROTEOMIC_DATA_PER_GENE((value, cp) ->
-			cp.cs.setUseStrongestProteomicsDataForActivity(Boolean.valueOf(value)),
+			cp.cs.setUseStrongestProteomicsDataForActivity(BooleanUtil.parseBoolWithException(value)),
 			"Use strongest proteomic data per gene",
 			"When a proteomic experiment outputs too many phosphorylation sites with lots of changes, many proteins " +
 				"have evidences for both activation and inhibition. This produces networks hard to read. A complexity" +
@@ -1640,7 +1985,7 @@ public class CausalPath
 				"the upstream of relations. This is false by default.",
 			new EntryType(Boolean.class), new Boolean[][]{{Boolean.FALSE}}, true, false, null),
 		USE_MISSING_PROTEOMIC_DATA_FOR_TEST((value, cp) ->
-			cp.testMissingValues = Boolean.valueOf(value),
+			cp.testMissingValues = BooleanUtil.parseBoolWithException(value),
 			"Include missing proteomic data in tests",
 			"Option to use a G-test to check unequal distribution of missing values. If opted, and data is sufficient" +
 				", the G-test result is combined with t-test result with Fisher's method. But beware. This method " +
@@ -1667,7 +2012,12 @@ public class CausalPath
 				" a G-test for that row.",
 			new EntryType(Double.class), new String[][]{{"0.001"}}, true, false,
 			new Cond(USE_MISSING_PROTEOMIC_DATA_FOR_TEST.getText(), Boolean.TRUE)),
-		CUSTOM_RESOURCE_DIRECTORY((value, cp) -> ResourceDirectory.set(value),
+		CUSTOM_RESOURCE_DIRECTORY((value, cp) -> {
+			if (FileUtility.directoryExists(value))
+				throw new IllegalDirectoryException("Provided directory path for custom-resource-directory: '" + value +
+						"' does not exist");
+			ResourceDirectory.set(value);
+		},
 			"Custom resource directory name",
 			"CausalPath downloads some data in the first run and stores in the resource directory. This directory is " +
 				"'.panda' by default. If this needs to be customized, use this parameter.",
@@ -1704,7 +2054,7 @@ public class CausalPath
 			new EntryType(File.class), null, false, false, new Cond(Logical.NOT)),
 		USE_EXPRESSION_FOR_ACTIVITY_EVIDENCE((value, cp) ->
 		{
-			if (Boolean.valueOf(value)) cp.cs.useExpressionForActivity();
+			if (BooleanUtil.parseBoolWithException(value)) cp.cs.useExpressionForActivity();
 		},
 			"Experimental parameter",
 			"For testing if RNA expression is a good proxy for protein activity.",
@@ -1956,7 +2306,8 @@ public class CausalPath
 		{
 			s = s.trim().toLowerCase();
 			if (s.startsWith("i") || s.startsWith("-")) return INHIBITED;
-			return ACTIVATED;
+			if (s.startsWith("a")) return ACTIVATED;
+			throw new IllegalGeneActivityLabelException();
 		}
 
 		public static Map getValuesAsJson()
