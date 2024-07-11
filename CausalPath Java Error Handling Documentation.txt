@@ -1,0 +1,69 @@
+--------------------------------------------
+LOGGING OVERVIEW
+--------------------------------------------
+Added logging to causalpath using slf4j and logback
+Added 3 new dependencies to the pom.xml file: slf4j-api, logback-core, and logback-classic
+
+Logback configuration file is located in src/main/resources/logback.xml
+
+Created a folder for logging related files located at: src/main/java.org.panda.causalpath/log
+This folder contains three new files: CPLogger, FileUtility, and LazyFileAppender
+
+CPLogger - This file contains static references to the various loggers used throughout causalpath. Four variables
+	for type Logger exist, one for each different log file.
+FileUtility - Contains two basic functions to check if a file exists and if a directory exists
+LazyFileAppender - Logback contains multiple types of appenders depending on how you want to do your logging.
+	It contains a file appender which lets your write your log messages to a file. A feature which this lacks
+	is the ability to not create a file until the first message is logged. By default, when you create a log, 
+	the file appender creates a file no matter what, even if there hasn't been a message yet. LazyFileAppender is 
+	an extension of FileAppender that only creates the file after the first message has been logged.
+
+--------------------------------------------
+EXCEPTIONS OVERVIEW
+--------------------------------------------
+Created a folder for custom exceptions located at: src/main/java.org.panda.causalpath/exceptions
+This folder contains various new exceptions with more detailed names that provide more info than the built-in java exceptions
+This folder also contains a file called BooleanUtil. This contains a function called parseBoolWithException. This parses a string
+into a boolean and throws an error if the input isn't "true" or "false" ignoring cases. The built-in method in Java does not throw 
+an error if you try to parse a string that is not "true" or "false.  
+
+--------------------------------------------
+HOW ERROR HANDLING WORKS
+--------------------------------------------
+There are two seperate divisions for error handling.
+One division is between parameters and data
+The other divisions is between warnings and errors.
+
+This leads to four different categories of error-handling:
+	invalid-parameter-warnings.log
+	invalid-parameter errors.log
+	invalid-data-warnings.log
+	invalid-data-errors.log
+
+Warnings are user inputs which do not cause the program to halt entirely. Causalpath will probably either ignore the inputs entirely or provide default values for the inputs and proceed fine.
+Errors are user inputs which are fatal to the execution of the program. The program cannot proceed if an error is encountered.
+
+Upon running CausalPath, the program will attempt to read in all the user provided parameters from the parameters.txt file. After reading the parameters, the program will analyze the data using the given parameters.
+
+--------------------------------------------
+PARAMETER PHASE
+--------------------------------------------
+For each parameter, if a warning or error is encountered, the program will log that to the appropriate file (either invalid-parameter-warnings.log if it is a warning or invalid-parameter-errors.log if it is an error). 
+
+If ANY ERRORS are encountered during the parameter phase, the program will NOT proceed to analyze the data. In the case that you wish this the program to proceed with data analysis even with parameter errors, you need to
+remove the return statement in the main functon of CausalPath.java when it checks if any parameter errors exist.
+
+The parameter error handling occurs in two places. Once in the set parameters function and in a new function called checkParameterValidity.
+
+In the set parameters function, basic errors such as providing an invalid type are caught. For example if the user inputs "true" when a number was expected, or if the user inputs an invalid value transformation.
+The parameters enums that take in a more complex value than just a number or boolean were modified to throw a custom exception on an invalid input. For example, the value transformation was modified to throw an 
+IllegalValueTransformationException.
+
+The checkParameterValidity function checks for more complex parameter requirements. For example, certain parameters should only be used if the value transformation is correlation. If the value transformation is not correlation, 
+these parameters make no sense. In this case, a warning will be thrown. If more complex parameter checks are to be added, this is where they should be added.
+
+--------------------------------------------
+DATA PHASE
+--------------------------------------------
+After the parameters are read, the program will proceed to the data analysis phase. Error handling in this phase is more spread out as errors are detected while parsing the data, which occurs in many places.
+These places include: throughout the run function in CausalPath.jar, the constructor in ProteomicsLoader.java, and the functions readAnnotations, readVals in ProteomicsFileReader.java
