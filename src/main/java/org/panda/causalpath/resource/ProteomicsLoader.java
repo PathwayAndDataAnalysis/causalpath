@@ -28,19 +28,11 @@ public class ProteomicsLoader {
     Set<ExperimentData> datas;
 
     /**
-     * UniProtSequence object to obtain amino acid sequences
-     */
-    UniProtSequence uI;
-
-    /**
      * Uniprot organism ID for humans
      */
     public static final String humanID = "9606";
 
     public ProteomicsLoader(Collection<ProteomicsFileRow> rows, Map<DataType, Double> stdevThresholds) {
-        // UniProtSequence sequence object to obtain amino acid sequences
-        uI = UniProtSequence.get();
-
 
         dataMap = new HashMap<>();
         datas = new HashSet<>();
@@ -84,7 +76,6 @@ public class ProteomicsLoader {
      */
     public ProteomicsLoader(Map<String, Set<ExperimentData>> dataMap) {
         this.dataMap = dataMap;
-        uI = UniProtSequence.get();
     }
 
 
@@ -147,8 +138,8 @@ public class ProteomicsLoader {
                                     // Identify the location
                                     int location = pS.getSite();
                                     // Get the uniprot name of the protein
-                                    String uniprotName = uI.getNameOfSymbol(protein, humanID);
-                                    String seqAroundSite = uI.getSeqAround(uniprotName, 5, 4, location);
+                                    String uniprotName = UniProtSequence.get().getNameOfSymbol(protein, humanID);
+                                    String seqAroundSite = UniProtSequence.get().getSeqAround(uniprotName, 5, 4, location);
                                     if (seqAroundSite != null) {
                                         seqChangeVal.put(seqAroundSite, siteModData.getChangeValue());
                                     }
@@ -204,12 +195,12 @@ public class ProteomicsLoader {
 
                 int location = proteinSite.getSite();
                 // Obtain the UNIPROT name for this protein
-                String nameOrID = uI.getNameOfSymbol(protein, humanID);
+                String nameOrID = UniProtSequence.get().getNameOfSymbol(protein, humanID);
 
                 // If statement runs prior to initial assignment to sequence variable
                 // I.e. First iteration of the for loop
                 if (sequence == null) {
-                    sequence = uI.getSeqAround(nameOrID, 5, 4, location);
+                    sequence = UniProtSequence.get().getSeqAround(nameOrID, 5, 4, location);
 					/* Method call may return null if there is it is not possible to recover
 					 sequence of such length. If the if statement runs,
 					 it cannot be true that every protein shares the same sequence surrounding location
@@ -222,7 +213,7 @@ public class ProteomicsLoader {
                     // Else runs for all iterations after first iteration
 
                     // currSeq refers to the sequence surrounding the location for the current protein
-                    String currSeq = uI.getSeqAround(nameOrID, 5, 4, location);
+                    String currSeq = UniProtSequence.get().getSeqAround(nameOrID, 5, 4, location);
 
                     // currSeq may be null in case where it is not possible to recover sequence of desired length
                     // In this case, it is not true that all the proteins share the same sequence, thus ret null
