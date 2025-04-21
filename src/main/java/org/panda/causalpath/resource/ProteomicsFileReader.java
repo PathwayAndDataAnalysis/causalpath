@@ -135,7 +135,7 @@ public class ProteomicsFileReader
 
 			while (sc.hasNextLine())
 			{
-				String[] row = sc.nextLine().split("\t");
+				String[] row = sc.nextLine().split("\t", -1);
 
 				for (int i = 0; i < colname.length; i++)
 				{
