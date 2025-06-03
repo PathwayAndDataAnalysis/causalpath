@@ -73,10 +73,23 @@ public class FDRAdjuster
 		}
 
 		// unite proteomics if needed
-		if (poolProteomics)
+		if (poolProteomics && dataMap.containsKey(DataType.PROTEIN))
 		{
-			dataMap.get(DataType.PROTEIN).addAll(dataMap.get(DataType.PHOSPHOPROTEIN));
-			dataMap.remove(DataType.PHOSPHOPROTEIN);
+			if (dataMap.containsKey(DataType.PHOSPHOPROTEIN))
+			{
+				dataMap.get(DataType.PROTEIN).addAll(dataMap.get(DataType.PHOSPHOPROTEIN));
+				dataMap.remove(DataType.PHOSPHOPROTEIN);
+			}
+			if (dataMap.containsKey(DataType.ACETYLPROTEIN))
+			{
+				dataMap.get(DataType.PROTEIN).addAll(dataMap.get(DataType.ACETYLPROTEIN));
+				dataMap.remove(DataType.ACETYLPROTEIN);
+			}
+			if (dataMap.containsKey(DataType.METHYLPROTEIN))
+			{
+				dataMap.get(DataType.PROTEIN).addAll(dataMap.get(DataType.METHYLPROTEIN));
+				dataMap.remove(DataType.METHYLPROTEIN);
+			}
 		}
 
 		// for each type detect the p-value threshold and set it
