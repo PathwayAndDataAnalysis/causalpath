@@ -663,9 +663,9 @@ public class CausalPath
 		}
 
 		// Estimate accuracy if did a network propagation of data
-		PropagationAccuracyPredictor pred = new PropagationAccuracyPredictor();
-		double accuracy = pred.run(causal, conflicting, cs.copy());
-		System.out.println("hypothetical propagation accuracy = " + accuracy);
+//		PropagationAccuracyPredictor pred = new PropagationAccuracyPredictor();
+//		double accuracy = pred.run(causal, conflicting, cs.copy());
+//		System.out.println("hypothetical propagation accuracy = " + accuracy);
 	}
 
 	private void ensureProteomicIDUniqueness(List<ProteomicsFileRow> rows)

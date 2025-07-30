@@ -298,18 +298,18 @@ public class GraphWriter
 
 				if (useGeneBGForTotalProtein && (let.equals("t") || let.equals("c")) && !totalProtUsedUp.contains(gene))
 				{
-					if (let.equals("c"))
-					{
-						FileUtil.writeln("node\t" + siteID + "\tcolor\t" + colS, writer2);
-						FileUtil.writeln("node\t" + siteID + "\ttooltip\t" + gene + ", " + val, writer2);
-						totalProtUsedUp.add(gene);
-					}
-					else
-					{
+//					if (let.equals("c"))
+//					{
+//						FileUtil.writeln("node\t" + siteID + "\tcolor\t" + colS, writer2);
+//						FileUtil.writeln("node\t" + siteID + "\ttooltip\t" + gene + ", " + val, writer2);
+//						totalProtUsedUp.add(gene);
+//					}
+//					else
+//					{
 						FileUtil.writeln("node\t" + gene + "\tcolor\t" + colS, writer2);
 						FileUtil.writeln("node\t" + gene + "\ttooltip\t" + siteID + ", " + val, writer2);
 						totalProtUsedUp.add(gene);
-					}
+//					}
 				}
 				else
 				{

@@ -17,10 +17,10 @@ import java.util.stream.Collectors;
  */
 public class MergeResultsIntoSeriesView
 {
-	public static final String SIF_FILE = "causative.sif";
+	public static final String SIF_FILE = "oncogenic-changes-lung.sif";
 	public static final String PARAMETERS_FILE = "parameters.txt";
-	public static final String FORMAT_FILE = "causative.format";
-	public static final String SERIES_FILE = "causative.formatseries";
+	public static final String FORMAT_FILE = "oncogenic-changes-lung.format";
+	public static final String SERIES_FILE = "oncogenic-changes-lung.formatseries";
 	public static final String DEFAULT_OUT_DIR = "AsSeries";
 
 	List<String> inDirs;
@@ -262,7 +262,7 @@ public class MergeResultsIntoSeriesView
 
 	public static void main(String[] args) throws IOException
 	{
-		runFlatFolders("/Users/ozgun/Documents/Analyses/Bouhaddou/",
-			"Inf_00Hr", "Inf_02Hr", "Inf_04Hr", "Inf_08Hr", "Inf_12Hr", "Inf_24Hr");
+		runFlatFolders("/home/ozgunbabur/Analyses/CPTAC-LSCC/v3/tumors-vs-normals-per-NMF-subtype/",
+			"Metabolic.proliferative", "NOTCH2.immune.cold", "TP53WT.hot.quiescent", "ROS.hot", "EMT.angio.quiescent", "TP63SOX2amp.KEAP1.prolif.cold");
 	}
 }

@@ -29,7 +29,7 @@ public class NetworkLoader
 	public static Set<Relation> load()
 	{
 		return load(new HashSet<>(Arrays.asList(ResourceType.PC, ResourceType.PhosphoSitePlus,
-			ResourceType.PhosphoNetworks, ResourceType.IPTMNet, ResourceType.TRRUST, ResourceType.TFactS/*, ResourceType.PCMetabolic*/)));
+			ResourceType.PhosphoNetworks, ResourceType.IPTMNet, ResourceType.TRRUST, ResourceType.TFactS, ResourceType.PCMetabolic)));
 	}
 
 	/**

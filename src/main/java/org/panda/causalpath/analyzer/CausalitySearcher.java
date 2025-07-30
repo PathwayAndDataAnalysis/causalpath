@@ -536,8 +536,8 @@ public class CausalitySearcher implements Cloneable
 
 		BufferedWriter writer = Files.newBufferedWriter(Paths.get(filename));
 		writer.write("Source\tRelation\tTarget\tSites\t");
-		if (corDet != null) writer.write("Source data ID\tTarget data ID\tCorrelation\tCorrelation pval");
-		else writer.write("Source data ID\tSource change\t Source change pval\tTarget data ID\tTarget change\tTarget change pval");
+		if (corDet != null) writer.write("Source data type\tSource data ID\tSource site effect\tTarget data type\tTarget data ID\tTarget site effect\tCorrelation\tCorrelation pval");
+		else writer.write("Source data type\tSource data ID\tSource site effect\tSource change\t Source change pval\tTarget data type\tTarget data ID\tTarget site effect\tTarget change\tTarget change pval");
 
 		pairsUsedForInference.keySet().stream().
 			sorted(Comparator.comparing(this::getRelationScore).reversed()). // Sort relations to their significance
@@ -549,20 +549,23 @@ public class CausalitySearcher implements Cloneable
 
 			FileUtil.lnwrite(r.source + "\t" + r.type.getName() + "\t" + r.target + "\t" + r.getSitesInString() + "\t", writer);
 
+			String srcSiteEffect = sourceData.isSiteSpecific() ? sourceData.getEffect() == 1 ? "a" : sourceData.getEffect() == -1 ? "i" : "" : "";
+			String tgtSiteEffect = targetData.isSiteSpecific() ? targetData.getEffect() == 1 ? "a" : targetData.getEffect() == -1 ? "i" : "" : "";
+
 			if (corDet != null)
 			{
 				Tuple t = corDet.calcCorrelation(sourceData, targetData);
-				FileUtil.write(sourceData.getId() + "\t" + targetData.getId() + "\t" + t.v + "\t" + t.p, writer);
+				FileUtil.write(sourceData.getType().getName() + "\t" + sourceData.getId() + "\t" + srcSiteEffect + "\t" + targetData.getType().getName() + "\t" + targetData.getId() + "\t" + tgtSiteEffect + "\t" + t.v + "\t" + t.p, writer);
 			}
 			else
 			{
 				OneDataChangeDetector sDet = sourceData.getChDet();
 				OneDataChangeDetector tDet = targetData.getChDet();
 
-				FileUtil.write(sourceData.getId() + "\t" + sourceData.getChangeValue() + "\t" +
+				FileUtil.write(sourceData.getType().getName() + "\t" + sourceData.getId() + "\t" + srcSiteEffect + "\t" + sourceData.getChangeValue() + "\t" +
 					(sDet instanceof SignificanceDetector ? ((SignificanceDetector) sDet).getPValue(sourceData) : "") + "\t", writer);
 
-				FileUtil.write(targetData.getId() + "\t" + targetData.getChangeValue() + "\t" +
+				FileUtil.write(targetData.getType().getName() + "\t" + targetData.getId() + "\t" + tgtSiteEffect + "\t" + targetData.getChangeValue() + "\t" +
 					(tDet instanceof SignificanceDetector ? ((SignificanceDetector) tDet).getPValue(targetData) : ""), writer);
 			}
 		}));
