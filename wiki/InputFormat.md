@@ -117,7 +117,7 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 
 `site-effect-proximity-threshold`: Site-effect proximity threshold. CausalPath has a database of phosphorylation site effects. When not set, this parameter is 0 by default, which means exact usage of site effects. But sometimes we may see a site with unknown effect is modified, which is very close to another site with a known effect. This parameter let's us to assume those changing sites with unknown effect has the same effect with the neighbor site with known effect. Use responsibly.
 
-`built-in-network-resource-selection`: Built-in network resources to use. Determines which network resource to use during the analysis. Multiple network resource should be mentioned together, separated with a space or comma. Possible values are below.
+`built-in-network-resource-selection`: Built-in network resource to use. Determines which network resource to use during the analysis. If ultiple resources are desired, this parameter can be repeated, with each resource given on a new line. Possible values are below.
 
 	PC: Pathway Commons v9 for all kinds of relations.
 
@@ -194,6 +194,8 @@ The name of the parameters file have to be `parameters.txt` exactly. Each parame
 `hgnc-file`: HGNC data file. For reproducibility: Provide an HGNC resource file to reproduce a previous analysis.
 
 `custom-causal-priors-file`: Custom causal priors file. For reproducibility: Provide a custom file for causal priors.
+
+`additional-custom-priors`: Additional custom causal priors file(s). This is for inserting custom hypotheses in the form of relations.
 
 `custom-site-effects-file`: Custom site effects file. For reproducibility: Provide a custom file for site effects.
 

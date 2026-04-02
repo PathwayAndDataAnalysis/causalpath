@@ -1519,9 +1519,9 @@ public class CausalPath
 			if (cp.networkSelection == null) cp.networkSelection = new HashSet<>();
 			cp.networkSelection.add(value);
 		},
-			"Built-in network resources to use",
-			"Determines which network resource to use during the analysis. Multiple network resource should be " +
-				"mentioned together, separated with a space or comma. Possible values are below.\n" +
+			"Built-in network resource to use",
+			"Determines which network resource to use during the analysis. If ultiple resources are desired, " +
+				"this parameter can be repeated, with each resource given on a new line. Possible values are below.\n" +
 				NetworkLoader.ResourceType.getUsageInfo(),
 			new EntryType(NetworkLoader.ResourceType.class), new String[][]{
 			new String[]{NetworkLoader.ResourceType.PC.name()},
