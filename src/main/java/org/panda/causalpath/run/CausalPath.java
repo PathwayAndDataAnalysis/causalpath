@@ -1520,7 +1520,7 @@ public class CausalPath
 			cp.networkSelection.add(value);
 		},
 			"Built-in network resource to use",
-			"Determines which network resource to use during the analysis. If ultiple resources are desired, " +
+			"Determines which network resource to use during the analysis. If multiple resources are desired, " +
 				"this parameter can be repeated, with each resource given on a new line. Possible values are below.\n" +
 				NetworkLoader.ResourceType.getUsageInfo(),
 			new EntryType(NetworkLoader.ResourceType.class), new String[][]{
