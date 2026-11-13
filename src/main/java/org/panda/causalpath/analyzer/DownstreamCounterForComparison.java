@@ -77,6 +77,51 @@ public class DownstreamCounterForComparison extends DownstreamCounterForCorrelat
 		return new Map[]{convertToCounts(total), convertToCounts(activ), convertToCounts(inhib)};
 	}
 
+	public Map<String, Integer>[] run(Map<ExperimentData, Integer> shuffleMap)
+	{
+		Map<String, Set<String>> total = new HashMap<>();
+		Map<String, Set<String>> activ = new HashMap<>();
+		Map<String, Set<String>> inhib = new HashMap<>();
+
+		Set<Relation> relations = rel2Datas.keySet();
+
+		relations.forEach(r ->
+		{
+			Set<ExperimentData> td = rel2Datas.get(r);
+
+			if (!td.isEmpty())
+			{
+				if (!total.containsKey(r.source))
+				{
+					total.put(r.source, new HashSet<>());
+					activ.put(r.source, new HashSet<>());
+					inhib.put(r.source, new HashSet<>());
+				}
+			}
+
+			td.forEach(d ->
+			{
+				int sign = d.getChangeSign(shuffleMap) * r.getSign();
+
+				if (sign != 0)
+				{
+					total.get(r.source).add(r.target);
+				}
+
+				if (sign == 1)
+				{
+					activ.get(r.source).add(r.target);
+				}
+				else if (sign == -1)
+				{
+					inhib.get(r.source).add(r.target);
+				}
+			});
+		});
+
+		return new Map[]{convertToCounts(total), convertToCounts(activ), convertToCounts(inhib)};
+	}
+
 	public Map<String, Integer> getGenesPotentialDownstreamMax(Set<Relation> relations)
 	{
 		Map<String, Set<String>> map = new HashMap<>();
@@ -96,5 +141,10 @@ public class DownstreamCounterForComparison extends DownstreamCounterForCorrelat
 
 		return relations.stream().map(r -> r.source).filter(gene -> !consider.contains(gene))
 			.collect(Collectors.toSet());
+	}
+
+	public DownstreamCounterForComparison clone()
+	{
+		return (DownstreamCounterForComparison) super.clone();
 	}
 }

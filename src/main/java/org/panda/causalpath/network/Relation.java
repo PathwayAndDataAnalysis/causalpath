@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 /**
  * That is a potential causality relation.
  */
-public class Relation
+public class Relation implements Cloneable
 {
 	/**
 	 * Source gene.

@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
  *
  * @author Ozgun Babur
  */
-public class DataLabelShuffler
+public class DataLabelShuffler implements Cloneable
 {
 	Set<Relation> relations;
 
@@ -148,6 +148,19 @@ public class DataLabelShuffler
 
 		dataMap.put(orig.id, copy);
 		return copy;
+	}
+
+	public DataLabelShuffler clone()
+	{
+		try
+		{
+			return (DataLabelShuffler) super.clone();
+		}
+		catch (CloneNotSupportedException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	class ChDet implements OneDataChangeDetector

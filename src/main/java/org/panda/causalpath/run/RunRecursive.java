@@ -2,6 +2,7 @@ package org.panda.causalpath.run;
 
 import org.panda.utility.FileUtil;
 import org.panda.utility.RunUtil;
+import org.panda.utility.ThreadRoutingStream;
 
 import java.io.File;
 import java.io.IOException;
@@ -57,6 +58,11 @@ public class RunRecursive
 
 	private static void runMultiCore(String dir, int cores) throws IOException, ClassNotFoundException
 	{
+		ThreadRoutingStream routedOut = new ThreadRoutingStream(System.out);
+		ThreadRoutingStream routedErr = new ThreadRoutingStream(System.err);
+		System.setOut(routedOut);
+		System.setErr(routedErr);
+
 		List<Runnable> runnables = new ArrayList<>();
 
 		FileUtil.processDirsRecursive(new File(dir), curDir ->

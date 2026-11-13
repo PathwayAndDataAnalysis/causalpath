@@ -19,16 +19,11 @@ import org.panda.resource.siteeffect.Signor;
 import org.panda.resource.siteeffect.SiteEffectCollective;
 import org.panda.resource.siteeffect.Feature;
 import org.panda.resource.tcga.ProteomicsFileRow;
-import org.panda.utility.ArrayUtil;
-import org.panda.utility.BooleanMatrixRandomizer;
-import org.panda.utility.FileUtil;
-import org.panda.utility.RandomizedMatrices;
+import org.panda.utility.*;
 import org.panda.utility.statistics.FDR;
 import org.panda.utility.statistics.FishersExactTest;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
@@ -53,6 +48,8 @@ public class CausalPath
 	public static final String SIGNIFICANCE_FILENAME = "significance-pvals.txt";
 	public static final String VALUE_CHANGES_FILENAME = "value-changes.txt";
 	public static final String RESULTS_FILENAME = "results.txt";
+	public static final String LOG_FILENAME = "log.txt";
+	public static final String ERROR_FILENAME = "log-error.txt";
 
 	/**
 	 * The directory where the parameters.txt file resides in.
@@ -288,6 +285,8 @@ public class CausalPath
 
 	private static boolean webServerMode = false;
 
+	private static int useCores = 10;
+
 	public static void main(String[] args) throws IOException, ClassNotFoundException
 	{
 		if (args.length < 1)
@@ -312,7 +311,14 @@ public class CausalPath
 			return;
 		}
 
-		if (args.length > 1 && args[1].equals("-ws")) webServerMode = true;
+		for (int i = 1; i < args.length; i++)
+		{
+			if (args[i].equals("-ws")) webServerMode = true;
+			else if (args[i].equals("-cores") && args.length > ++i)
+			{
+				useCores = Integer.parseInt(args[i]);
+			}
+		}
 
 		new CausalPath(args[0]).run();
 	}
@@ -347,6 +353,19 @@ public class CausalPath
 	 */
 	public void run() throws IOException, ClassNotFoundException
 	{
+		if (!(System.out instanceof ThreadRoutingStream))
+		{
+			ThreadRoutingStream routedOut = new ThreadRoutingStream(System.out);
+			ThreadRoutingStream routedErr = new ThreadRoutingStream(System.err);
+			System.setOut(routedOut);
+			System.setErr(routedErr);
+		}
+		PrintStream logFile = new PrintStream(new FileOutputStream(directory + "/" + LOG_FILENAME, true));
+		PrintStream errFile = new PrintStream(new FileOutputStream(directory + "/" + ERROR_FILENAME, true));
+
+		((ThreadRoutingStream) System.out).bindLogFile(logFile);
+		((ThreadRoutingStream) System.err).bindLogFile(errFile);
+
 		System.out.println("directory = " + directory);
 
 		// Set the data types that are explainable by expressional relations
@@ -666,6 +685,9 @@ public class CausalPath
 //		PropagationAccuracyPredictor pred = new PropagationAccuracyPredictor();
 //		double accuracy = pred.run(causal, conflicting, cs.copy());
 //		System.out.println("hypothetical propagation accuracy = " + accuracy);
+
+		((ThreadRoutingStream) System.out).unbindLogFile();
+		((ThreadRoutingStream) System.err).unbindLogFile();
 	}
 
 	private void ensureProteomicIDUniqueness(List<ProteomicsFileRow> rows)
@@ -774,7 +796,7 @@ public class CausalPath
 			else
 			{
 				nsc.setMinimumPotentialTargetsToConsider(minimumPotentialTargetsToConsiderForDownstreamSignificance);
-				nsc.run(permutationCount);
+				nsc.runParallel(permutationCount, useCores);
 				nsc.writeResults(outFile);
 			}
 

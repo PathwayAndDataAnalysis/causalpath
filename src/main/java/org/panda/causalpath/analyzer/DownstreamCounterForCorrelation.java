@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
  *
  * @author Ozgun Babur
  */
-public class DownstreamCounterForCorrelation
+public class DownstreamCounterForCorrelation implements Cloneable
 {
 	CausalitySearcher cs;
 
@@ -59,5 +59,18 @@ public class DownstreamCounterForCorrelation
 
 		return relations.stream().map(r -> r.source).filter(gene -> !consider.contains(gene))
 			.collect(Collectors.toSet());
+	}
+
+	public DownstreamCounterForCorrelation clone()
+	{
+		try
+		{
+			return (DownstreamCounterForCorrelation) super.clone();
+		}
+		catch (CloneNotSupportedException e)
+		{
+			e.printStackTrace();
+			return null;
+		}
 	}
 }

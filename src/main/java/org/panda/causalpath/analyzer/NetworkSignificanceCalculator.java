@@ -73,6 +73,11 @@ public abstract class NetworkSignificanceCalculator
 	public abstract void run(int iterations);
 
 	/**
+	 * Performs a randomization experiment.
+	 */
+	public abstract void runParallel(int iterations, int cores);
+
+	/**
 	 * Gets the p-val for the network size.
 	 *
 	 * @return p-val

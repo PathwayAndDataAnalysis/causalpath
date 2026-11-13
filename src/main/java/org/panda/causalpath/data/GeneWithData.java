@@ -11,7 +11,7 @@ import java.util.stream.Stream;
  *
  * @author Ozgun Babur
  */
-public class GeneWithData
+public class GeneWithData implements Cloneable
 {
 	/**
 	 * ID of the gene, typically the gene symbol

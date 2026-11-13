@@ -4,12 +4,13 @@ import org.panda.causalpath.analyzer.OneDataChangeDetector;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * Base class for a series of experiment data for a gene.
  */
-public abstract class ExperimentData
+public abstract class ExperimentData implements Cloneable
 {
 	/**
 	 * ID of the measurement. This can be an identifier of the antibody in an RPPA experiment, or gene symbol for a
@@ -61,6 +62,16 @@ public abstract class ExperimentData
 		}
 
 		return chDet.getChangeSign(this);
+	}
+
+	public int getChangeSign(Map<ExperimentData, Integer> randomizedMap)
+	{
+		if (!randomizedMap.containsKey(this))
+		{
+			throw new RuntimeException("The given randomized map does not contain this ExperimentData");
+		}
+
+		return randomizedMap.get(this);
 	}
 
 	public double getChangeValue()

@@ -3,6 +3,7 @@ package org.panda.causalpath.analyzer;
 import org.panda.causalpath.network.Relation;
 import org.panda.utility.ArrayUtil;
 import org.panda.utility.FileUtil;
+import org.panda.utility.Kronometre;
 import org.panda.utility.Progress;
 import org.panda.utility.statistics.FDR;
 
@@ -11,6 +12,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -144,6 +148,319 @@ public class NSCForComparison extends NetworkSignificanceCalculator
 		// Convert counts to p-values
 
 		graphSizePval = sizeCnt / (double) iterations;
+
+		this.pvalMaps = new Map[3];
+		for (int i = 0; i < 3; i++)
+		{
+			pvalMaps[i] = new HashMap<>();
+
+			for (String gene : current[i].keySet())
+			{
+				double pval;
+
+				if (current[i].get(gene) == 0)
+				{
+					pval = 1;
+				}
+				else
+				{
+					int c = !cnt[i].containsKey(gene) ? 0 : cnt[i].get(gene);
+					if (c == 0) c++; // we don't want 0 as a p-value because they will always pass multiple hypothesis correction
+					pval = c / (double) iterations;
+				}
+
+				pvalMaps[i].put(gene, pval);
+			}
+		}
+	}
+
+	/**
+	 * Performs a randomization experiment.
+	 */
+	public void runParallel_Old(int iterations, int cores)
+	{
+		// Replace relations with a shuffle-safe copy
+		DataLabelShuffler dls = new DataLabelShuffler(relations);
+		Set<Relation> rels = dls.getRelations();
+
+		rels = rels.stream().filter(cs::hasConsiderableDownstreamData).collect(Collectors.toSet());
+
+		// Init counter
+		DownstreamCounterForComparison dc = new DownstreamCounterForComparison(cs, rels);
+
+		// Get the genes with no sufficient data or their downstream have no such data even to be considered
+		Set<String> ignore = dc.getGenesWithNoPotential(rels);
+
+		// Get current statistics
+		Map<String, Integer>[] current = dc.run();
+		rels.stream().map(r -> r.source).distinct().filter(gene -> !ignore.contains(gene) && !current[0].containsKey(gene))
+			.forEach(gene ->
+			{
+				current[0].put(gene, 0);
+				current[1].put(gene, 0);
+				current[2].put(gene, 0);
+			});
+
+		// Get max possible counts for each source gene
+		Map<String, Integer> maxPotential = dc.getGenesPotentialDownstreamMax(rels);
+
+		if (minimumPotentialTargetsToConsider > 1)
+		{
+			new HashSet<>(current[0].keySet()).stream().filter(gene ->
+				!maxPotential.containsKey(gene) || maxPotential.get(gene) < minimumPotentialTargetsToConsider)
+				.forEach(gene ->
+				{
+					current[0].remove(gene);
+					current[1].remove(gene);
+					current[2].remove(gene);
+					ignore.add(gene);
+				});
+		}
+
+		// Init counters for the randomizations
+		Map<String, Integer>[] cnt = new Map[3];
+		for (int i = 0; i < 3; i++)
+		{
+			cnt[i] = new HashMap<>();
+		}
+
+		int availableCores = Runtime.getRuntime().availableProcessors();
+		if (cores <= 0 || availableCores < cores) cores = availableCores;
+
+		System.out.println("Running on " + cores + " CPU cores");
+		ExecutorService executor = Executors.newFixedThreadPool(cores);
+
+		int iterPerCore = (int) Math.ceil(iterations / (double) cores);
+		iterations = iterPerCore * cores;
+
+		System.out.println("iterPerCore = " + iterPerCore);
+		System.out.println("iterations = " + iterations);
+
+		Progress prog = new Progress(iterations, "Calculating significances");
+
+		for (int k = 0; k < cores; k++)
+		{
+			executor.submit(() ->
+				{
+					DataLabelShuffler dlsCopy = dls.clone();
+					DownstreamCounterForComparison dcCopy = new DownstreamCounterForComparison(cs, dls.getRelations());
+
+					Map<String, Integer>[] localCnt = new Map[3];
+					for (int j = 0; j < 3; j++)
+					{
+						localCnt[j] = new HashMap<>();
+					}
+
+					for (int i = 0; i < iterPerCore; i++)
+					{
+						// Shuffle data labels and count downstream of each gene
+						dlsCopy.shuffle();
+						Map<String, Integer>[] run = dcCopy.run();
+
+						// Count the cases shuffling provided as good results
+						for (int j = 0; j < 3; j++)
+						{
+							for (String gene : run[j].keySet())
+							{
+								if (ignore.contains(gene))
+								{
+									continue;
+								}
+
+								if (run[j].get(gene) >= current[j].get(gene))
+								{
+									localCnt[j].put(gene, localCnt[j].getOrDefault(gene, 0) + 1);
+								}
+							}
+						}
+
+						prog.tick();
+					}
+
+					synchronized (cnt)
+					{
+						for (int j = 0; j < 3; j++)
+						{
+							for (Map.Entry<String, Integer> entry : localCnt[j].entrySet())
+							{
+								cnt[j].put(entry.getKey(), cnt[j].getOrDefault(entry.getKey(), 0) + entry.getValue());
+							}
+						}
+					}
+				});
+		}
+
+		executor.shutdown();
+		try {
+			executor.awaitTermination(1, TimeUnit.HOURS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		// Convert counts to p-values
+
+//		graphSizePval = sizeCnt / (double) iterations;
+		graphSizePval = Double.NaN;
+
+		this.pvalMaps = new Map[3];
+		for (int i = 0; i < 3; i++)
+		{
+			pvalMaps[i] = new HashMap<>();
+
+			for (String gene : current[i].keySet())
+			{
+				double pval;
+
+				if (current[i].get(gene) == 0)
+				{
+					pval = 1;
+				}
+				else
+				{
+					int c = !cnt[i].containsKey(gene) ? 0 : cnt[i].get(gene);
+					if (c == 0) c++; // we don't want 0 as a p-value because they will always pass multiple hypothesis correction
+					pval = c / (double) iterations;
+				}
+
+				pvalMaps[i].put(gene, pval);
+			}
+		}
+	}
+
+	/**
+	 * Performs a randomization experiment using multiple CPU cores.
+	 */
+	public void runParallel(int iterations, int cores)
+	{
+		// Replace relations with a shuffle-safe copy
+		DataLabelShufflerForParallelComputing dls = new DataLabelShufflerForParallelComputing(relations);
+
+		Set<Relation> rels = relations.stream().filter(cs::hasConsiderableDownstreamData).collect(Collectors.toSet());
+
+		// Init counter
+		DownstreamCounterForComparison dc = new DownstreamCounterForComparison(cs, rels);
+
+		// Get the genes with no sufficient data or their downstream have no such data even to be considered
+		Set<String> ignore = dc.getGenesWithNoPotential(rels);
+
+		// Get current statistics
+		Map<String, Integer>[] current = dc.run(dls.getShuffleMap()); // we haven't shuffled yet
+		rels.stream().map(r -> r.source).distinct().filter(gene -> !ignore.contains(gene) && !current[0].containsKey(gene))
+			.forEach(gene ->
+			{
+				current[0].put(gene, 0);
+				current[1].put(gene, 0);
+				current[2].put(gene, 0);
+			});
+
+		// Get max possible counts for each source gene
+		Map<String, Integer> maxPotential = dc.getGenesPotentialDownstreamMax(rels);
+
+		if (minimumPotentialTargetsToConsider > 1)
+		{
+			new HashSet<>(current[0].keySet()).stream().filter(gene ->
+				!maxPotential.containsKey(gene) || maxPotential.get(gene) < minimumPotentialTargetsToConsider)
+				.forEach(gene ->
+				{
+					current[0].remove(gene);
+					current[1].remove(gene);
+					current[2].remove(gene);
+					ignore.add(gene);
+				});
+		}
+
+		// Get a run with non-randomized data to find current size
+//		Set<Relation> result = cs.run(rels);
+//		long sizeCurrent = result.size();
+
+//		long sizeCnt = 0;
+
+		// Init counters for the randomizations
+		Map<String, Integer>[] cnt = new Map[3];
+		for (int i = 0; i < 3; i++)
+		{
+			cnt[i] = new HashMap<>();
+			for (String gene : current[i].keySet())
+			{
+				cnt[i].put(gene, 0);
+			}
+		}
+
+		int availableCores = Runtime.getRuntime().availableProcessors();
+		if (cores <= 0 || availableCores < cores) cores = availableCores;
+
+		System.out.println("Running on " + cores + " CPU cores");
+		ExecutorService executor = Executors.newFixedThreadPool(cores);
+
+		int iterPerCore = (int) Math.ceil(iterations / (double) cores);
+		iterations = iterPerCore * cores;
+
+		System.out.println("iterPerCore = " + iterPerCore);
+		System.out.println("iterations = " + iterations);
+
+		Progress prog = new Progress(iterations, "Calculating significances");
+		Kronometre kron = new Kronometre();
+
+		for (int k = 0; k < cores; k++)
+		{
+			executor.submit(() ->
+			{
+				DataLabelShufflerForParallelComputing dlsClone = dls.clone();
+
+				Map<String, Integer>[] localCnt = new Map[3];
+				for (int j = 0; j < 3; j++)
+				{
+					localCnt[j] = new HashMap<>();
+				}
+
+				for (int i = 0; i < iterPerCore; i++)
+				{
+					// Shuffle data labels and count downstream of each gene
+					dlsClone.shuffle();
+					Map<String, Integer>[] run = dc.run(dlsClone.getShuffleMap());
+
+					// Count the cases shuffling provided as good results
+					for (int j = 0; j < 3; j++)
+					{
+						for (String gene : run[j].keySet())
+						{
+							if (ignore.contains(gene))
+							{
+								continue;
+							}
+
+							if (run[j].get(gene) >= current[j].get(gene))
+							{
+								localCnt[j].put(gene, localCnt[j].getOrDefault(gene, 0) + 1);
+							}
+						}
+					}
+					prog.tick();
+				}
+				synchronized (cnt)
+				{
+					for (int j = 0; j < 3; j++)
+					{
+						for (Map.Entry<String, Integer> entry : localCnt[j].entrySet())
+						{
+							cnt[j].put(entry.getKey(), cnt[j].getOrDefault(entry.getKey(), 0) + entry.getValue());
+						}
+					}
+				}
+			});
+		}
+
+		executor.shutdown();
+		try {
+			executor.awaitTermination(1, TimeUnit.HOURS);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		}
+		kron.print();
+
+		// Convert counts to p-values
+
+//		graphSizePval = sizeCnt / (double) iterations;
+		graphSizePval = Double.NaN;
 
 		this.pvalMaps = new Map[3];
 		for (int i = 0; i < 3; i++)

@@ -179,6 +179,13 @@ public class NSCForCorrelation extends NetworkSignificanceCalculator
 		}
 	}
 
+	@Override
+	public void runParallel(int iterations, int cores)
+	{
+		throw new RuntimeException("Method not implemented yet");
+ 	}
+
+
 	public Map<String, Double> getDownstreamActivityPvals()
 	{
 		return pvals;
